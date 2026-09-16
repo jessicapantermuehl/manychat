@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { defaultClientFor, defaultGhlClient, handleCommentEvents, handleMessageEvents } from "@/lib/runner";
+import { defaultAi, defaultClientFor, defaultGhlClient, handleCommentEvents, handleMessageEvents } from "@/lib/runner";
 import { getStore } from "@/lib/store";
 import { handleVerification, parseCommentEvents, parseMessageEvents, verifySignature } from "@/lib/webhook";
 
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     store,
     clientFor: (igUserId: string) => defaultClientFor(store, igUserId),
     ghlClient: defaultGhlClient,
+    ai: defaultAi,
     log: (msg: string, extra?: unknown) => console.error("[ConvertlySocial]", msg, extra),
   };
 

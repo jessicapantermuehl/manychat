@@ -38,6 +38,13 @@ export interface Automation {
   emailRetryText: string;
   /** Tags added to the GoHighLevel contact. */
   ghlTags: string[];
+  /**
+   * Plain-English description of what a commenter is asking for when this rule should fire,
+   * e.g. "someone asking for the gut health guide". Empty = keyword matching only.
+   */
+  intentDescription: string;
+  /** FAQ text the AI may answer from while waiting for the email. Empty = no AI answers. */
+  aiFaq: string;
   /** Whether the rule is live. */
   active: boolean;
   createdAt?: string;
@@ -101,7 +108,18 @@ export interface ActivityRecord {
   commentText: string;
   status: EventStatus;
   detail: string;
+  /** AI triage label, when AI is enabled. */
+  category?: string | null;
+  /** AI-drafted reply the owner could post by hand. */
+  suggestedReply?: string | null;
   createdAt?: string;
+}
+
+/** Per-account settings used by the AI features. */
+export interface AccountSettings {
+  igUserId: string;
+  voiceSamples: string;
+  brandNotes: string;
 }
 
 export interface IgAccount {

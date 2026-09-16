@@ -1,5 +1,5 @@
 import { deleteAutomation, toggleAutomation } from "./actions";
-import { env, hasGhl, hasSupabase } from "@/lib/env";
+import { env, hasAi, hasGhl, hasSupabase } from "@/lib/env";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="muted">Instagram comment → DM automations</div>
         </div>
         <div className="actions">
+          <a className="btn secondary" href="/settings">Voice &amp; AI</a>
           <a className="btn secondary" href="/api/instagram/connect">Connect Instagram</a>
           <a className="btn" href="/automations/new">New automation</a>
         </div>
@@ -40,6 +41,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
+      {!hasAi() && (
+        <div className="notice bad">
+          AI features are off. Set ANTHROPIC_API_KEY to enable intent matching, comment triage, FAQ answers and copy drafting.
+        </div>
+      )}
       {emailRulesExist && !hasGhl() && (
         <div className="notice bad">
           An automation collects emails but GoHighLevel is not configured. Emails are still saved here; set GHL_API_KEY and GHL_LOCATION_ID to push them to your CRM.
@@ -134,7 +140,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         {activity.length > 0 && (
           <table>
             <thead>
-              <tr><th>When</th><th>From</th><th>Comment</th><th>Result</th><th>Detail</th></tr>
+              <tr><th>When</th><th>From</th><th>Comment</th><th>Type</th><th>Result</th><th>Detail</th><th>Suggested reply</th></tr>
             </thead>
             <tbody>
               {activity.map((r) => (
@@ -142,8 +148,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                   <td className="muted">{r.createdAt ? new Date(r.createdAt).toLocaleString() : ""}</td>
                   <td>@{r.fromUsername}</td>
                   <td>{r.commentText}</td>
+                  <td>{r.category ? <span className={`pill cat-${r.category}`}>{r.category}</span> : <span className="muted">—</span>}</td>
                   <td><span className={`pill ${r.status}`}>{r.status}</span></td>
                   <td className="muted">{r.detail}</td>
+                  <td className="muted">{r.suggestedReply || ""}</td>
                 </tr>
               ))}
             </tbody>

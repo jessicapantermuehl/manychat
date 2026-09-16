@@ -30,6 +30,8 @@ const rule: Automation = {
   emailPrompt: "",
   emailRetryText: "",
   ghlTags: [],
+  intentDescription: "",
+  aiFaq: "",
 };
 
 const event: CommentEvent = {

@@ -22,6 +22,10 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   /** Secret that Vercel cron sends in the Authorization header. */
   cronSecret: process.env.CRON_SECRET ?? "",
+  /** Anthropic API key. Enables intent matching, comment triage, FAQ answers and copy generation. */
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  /** Claude model used for the AI features. */
+  aiModel: process.env.AI_MODEL ?? "claude-opus-5",
   /** GoHighLevel private integration token (Settings → Private integrations, scope contacts.write). */
   ghlApiKey: process.env.GHL_API_KEY ?? "",
   /** GoHighLevel sub-account (location) id. */
@@ -40,4 +44,8 @@ export function hasSupabase(): boolean {
 
 export function hasGhl(): boolean {
   return Boolean(env.ghlApiKey && env.ghlLocationId);
+}
+
+export function hasAi(): boolean {
+  return Boolean(env.anthropicApiKey);
 }

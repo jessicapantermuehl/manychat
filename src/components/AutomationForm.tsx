@@ -123,6 +123,33 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
         </div>
       </fieldset>
 
+      <fieldset className="group">
+        <legend>AI (needs ANTHROPIC_API_KEY)</legend>
+        <label>
+          Intent description
+          <input
+            type="text"
+            name="intentDescription"
+            defaultValue={automation?.intentDescription ?? ""}
+            placeholder="someone asking for the gut health guide"
+          />
+          <span className="help">
+            Comments that miss the keywords are checked against this. “omg I need that!” then still fires. Leave empty for keywords only.
+          </span>
+        </label>
+        <label>
+          FAQ for the email step
+          <textarea
+            name="aiFaq"
+            defaultValue={automation?.aiFaq ?? ""}
+            placeholder={"Why do you need my email? So I can send the PDF and a couple of follow-up tips. Unsubscribe anytime.\nIs it free? Yes, completely."}
+          />
+          <span className="help">
+            If someone replies with a question instead of an email, Claude answers only from this text, then asks again. Leave empty to skip.
+          </span>
+        </label>
+      </fieldset>
+
       <label className="check">
         <input type="checkbox" name="ignoreReplies" defaultChecked={automation?.ignoreReplies ?? true} />
         Ignore comments that are replies to other comments

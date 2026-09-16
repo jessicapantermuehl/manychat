@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getStore } from "@/lib/store";
+import { getAi } from "@/lib/ai";
 import type { Automation } from "@/lib/types";
 
 function lines(value: FormDataEntryValue | null): string[] {
@@ -39,6 +40,8 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
     emailPrompt: String(form.get("emailPrompt") ?? "").trim(),
     emailRetryText: String(form.get("emailRetryText") ?? "").trim(),
     ghlTags: commaList(form.get("ghlTags")),
+    intentDescription: String(form.get("intentDescription") ?? "").trim(),
+    aiFaq: String(form.get("aiFaq") ?? "").trim(),
   };
 }
 
@@ -67,4 +70,44 @@ export async function deleteAutomation(form: FormData) {
   await getStore().deleteAutomation(id);
   revalidatePath("/");
   redirect("/?deleted=1");
+}
+
+export async function saveSettings(form: FormData) {
+  const igUserId = String(form.get("igUserId") ?? "").trim();
+  if (!igUserId) throw new Error("Choose an account.");
+  await getStore().upsertSettings({
+    igUserId,
+    voiceSamples: String(form.get("voiceSamples") ?? "").trim(),
+    brandNotes: String(form.get("brandNotes") ?? "").trim(),
+  });
+  revalidatePath("/settings");
+  redirect("/settings?saved=1");
+}
+
+/** Drafts the copy for a new automation with Claude, then opens the form pre-filled. */
+export async function generateAutomationCopy(form: FormData) {
+  const ai = getAi();
+  if (!ai) throw new Error("Set ANTHROPIC_API_KEY to enable AI copy generation.");
+  const igUserId = String(form.get("igUserId") ?? "").trim();
+  const offer = String(form.get("offer") ?? "").trim();
+  const keyword = String(form.get("keyword") ?? "").trim();
+  const link = String(form.get("dmLink") ?? "").trim();
+  const mediaId = String(form.get("mediaId") ?? "").trim();
+  if (!offer) throw new Error("Describe what you are giving away.");
+
+  const voice = igUserId ? await getStore().getSettings(igUserId) : null;
+  const copy = await ai.generateCopy({ offer, keyword, link, voice });
+
+  const params = new URLSearchParams({
+    igUserId,
+    mediaId,
+    name: offer.slice(0, 60),
+    keywords: keyword,
+    publicReplies: copy.publicReplies.join("\n"),
+    dmText: copy.dmText,
+    emailPrompt: copy.emailPrompt,
+    dmLink: link,
+    intentDescription: `someone asking for ${offer.slice(0, 120)}`,
+  });
+  redirect(`/automations/new?${params.toString()}`);
 }

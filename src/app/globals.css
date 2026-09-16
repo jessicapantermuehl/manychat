@@ -55,3 +55,8 @@ textarea { min-height: 90px; resize: vertical; }
 code { background: #f0ece4; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
 fieldset.group { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 12px; margin: 0; }
 fieldset.group legend { font-weight: 600; font-size: 14px; padding: 0 6px; }
+.pill.cat-lead { background: #e3ecf9; color: #1f4e9c; }
+.pill.cat-question { background: #f3efe3; color: var(--warn); }
+.pill.cat-praise { background: #e3f3ea; color: var(--ok); }
+.pill.cat-spam { background: #fbe4e2; color: var(--bad); }
+.pill.cat-other { background: #eee; color: var(--muted); }

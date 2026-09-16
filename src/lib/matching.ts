@@ -51,16 +51,25 @@ export function keywordMatches(
  * account-wide rules, and among equals the first (oldest) one wins.
  */
 export function findAutomation(event: CommentEvent, automations: Automation[]): Automation | null {
-  const candidates = automations.filter((a) => {
+  const candidates = eligibleAutomations(event, automations).filter((a) => keywordMatches(event.text, a.keywords, a.matchMode));
+  return pickPreferred(candidates);
+}
+
+/** Active rules for this account that apply to the comment's post and reply status, before keyword matching. */
+export function eligibleAutomations(event: CommentEvent, automations: Automation[]): Automation[] {
+  return automations.filter((a) => {
     if (!a.active) return false;
     if (a.igUserId !== event.igUserId) return false;
     if (a.mediaId && a.mediaId !== event.mediaId) return false;
     if (a.ignoreReplies && event.parentId) return false;
-    return keywordMatches(event.text, a.keywords, a.matchMode);
+    return true;
   });
+}
+
+/** Post-specific rules win over account-wide ones; among equals the oldest wins. */
+export function pickPreferred(candidates: Automation[]): Automation | null {
   if (candidates.length === 0) return null;
-  const scoped = candidates.find((a) => a.mediaId);
-  return scoped ?? candidates[0];
+  return candidates.find((a) => a.mediaId) ?? candidates[0];
 }
 
 /** Replaces {{username}} and {{link}} placeholders. */

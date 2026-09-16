@@ -32,6 +32,21 @@ Captured emails appear in the **Leads** table on the dashboard even if GoHighLev
 configured or the sync fails, so nothing is lost. In GHL, trigger a workflow off the tag to
 send the guide by email as well.
 
+### AI features (Claude)
+
+Set `ANTHROPIC_API_KEY` and four things switch on. Everything the AI does is logged in the
+activity table, and it only ever chooses between rules you wrote or answers from text you gave it.
+
+| Feature | Where | What it does |
+|---|---|---|
+| Intent matching | Automation → "Intent description" | A comment that misses your keywords is checked against each rule's description ("someone asking for the gut health guide"). "omg I need this" then still fires. Conservative by design: ambiguous comments never trigger a DM. |
+| Comment triage | Activity log | Every comment is labelled lead / question / praise / spam / other, with a reply you could post by hand. The log becomes an inbox. |
+| FAQ answers | Automation → "FAQ for the email step" | If someone replies to the email request with a question, Claude answers only from your FAQ, then asks for the email again. |
+| Copy drafting | New automation → "Draft with AI" | Describe the giveaway and get public replies, the DM and the email prompt written in your voice. |
+
+Paste a few of your own captions or DMs under **Voice & AI** so drafts and replies sound like you.
+The model defaults to `claude-opus-5`; change it with `AI_MODEL`.
+
 ## One-time setup
 
 ### 1. Meta app (about 15 minutes)
@@ -69,6 +84,10 @@ screencast showing the comment → DM flow; this app's dashboard is what you rec
 1. In GHL open the sub-account → **Settings → Private integrations** → create one with the
    `contacts.write` scope and copy the token into `GHL_API_KEY`.
 2. Copy the sub-account id from the URL (`/v2/location/<id>/...`) into `GHL_LOCATION_ID`.
+
+### 2c. Claude (only for the AI features)
+
+Create an API key at <https://console.anthropic.com> and set it as `ANTHROPIC_API_KEY`.
 
 ### 3. Deploy to Vercel
 
@@ -125,9 +144,10 @@ src/app/api/instagram/webhook   Meta webhook (GET verify, POST comments)
 src/app/api/instagram/connect   starts the Instagram OAuth flow
 src/app/api/instagram/callback  stores the long-lived token, subscribes webhooks
 src/app/api/cron/refresh-tokens weekly token refresh (Vercel cron)
-src/app                         dashboard: automations, post picker, activity log
+src/app                         dashboard: automations, post picker, activity log, leads, voice settings
 src/lib/instagram.ts            Instagram API client (private replies, comment replies, OAuth)
 src/lib/ghl.ts                  GoHighLevel client (contact upsert + tags)
+src/lib/ai.ts                   Claude-powered intent matching, triage, FAQ answers, copy drafting
 src/lib/matching.ts             keyword matching and rule selection
 src/lib/runner.ts               the comment → reply → DM pipeline and the email-capture DM handler
 src/lib/store.ts                Supabase store, plus an in-memory fallback

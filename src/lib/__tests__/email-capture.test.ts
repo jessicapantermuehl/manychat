@@ -43,6 +43,8 @@ const rule: Automation = {
   emailPrompt: "Hey {{username}}, what's your email?",
   emailRetryText: "Just the email please",
   ghlTags: ["instagram", "guide"],
+  intentDescription: "",
+  aiFaq: "",
 };
 
 const comment: CommentEvent = {

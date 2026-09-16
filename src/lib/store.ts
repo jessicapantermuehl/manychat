@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env, hasSupabase } from "./env";
-import type { ActivityRecord, Automation, Conversation, IgAccount } from "./types";
+import type { AccountSettings, ActivityRecord, Automation, Conversation, IgAccount } from "./types";
 
 export interface Store {
   listAutomations(igUserId?: string): Promise<Automation[]>;
@@ -22,6 +22,9 @@ export interface Store {
   upsertConversation(conversation: Conversation): Promise<void>;
   /** Captured leads, newest first. */
   listLeads(limit?: number): Promise<Conversation[]>;
+
+  getSettings(igUserId: string): Promise<AccountSettings | null>;
+  upsertSettings(settings: AccountSettings): Promise<void>;
 }
 
 /* ---------- Supabase implementation ---------- */
@@ -43,6 +46,8 @@ type AutomationRow = {
   email_prompt: string;
   email_retry_text: string;
   ghl_tags: string[];
+  intent_description: string;
+  ai_faq: string;
   created_at: string;
 };
 
@@ -94,6 +99,8 @@ function rowToAutomation(r: AutomationRow): Automation {
     emailPrompt: r.email_prompt ?? "",
     emailRetryText: r.email_retry_text ?? "",
     ghlTags: r.ghl_tags ?? [],
+    intentDescription: r.intent_description ?? "",
+    aiFaq: r.ai_faq ?? "",
     createdAt: r.created_at,
   };
 }
@@ -133,6 +140,8 @@ export class SupabaseStore implements Store {
       email_prompt: a.emailPrompt,
       email_retry_text: a.emailRetryText,
       ghl_tags: a.ghlTags,
+      intent_description: a.intentDescription,
+      ai_faq: a.aiFaq,
     };
     const { data, error } = await this.db.from("cs_automations").upsert(row).select("*").single();
     if (error) throw error;
@@ -159,6 +168,8 @@ export class SupabaseStore implements Store {
       comment_text: r.commentText,
       status: r.status,
       detail: r.detail,
+      category: r.category ?? null,
+      suggested_reply: r.suggestedReply ?? null,
     });
     if (error) throw error;
   }
@@ -175,6 +186,8 @@ export class SupabaseStore implements Store {
       commentText: r.comment_text,
       status: r.status,
       detail: r.detail,
+      category: r.category ?? null,
+      suggestedReply: r.suggested_reply ?? null,
       createdAt: r.created_at,
     })) as ActivityRecord[];
   }
@@ -228,6 +241,22 @@ export class SupabaseStore implements Store {
     if (error) throw error;
     return (data as ConversationRow[]).map(rowToConversation);
   }
+
+  async getSettings(igUserId: string) {
+    const { data, error } = await this.db.from("cs_settings").select("*").eq("ig_user_id", igUserId).maybeSingle();
+    if (error) throw error;
+    return data ? { igUserId: data.ig_user_id, voiceSamples: data.voice_samples ?? "", brandNotes: data.brand_notes ?? "" } : null;
+  }
+
+  async upsertSettings(s: AccountSettings) {
+    const { error } = await this.db.from("cs_settings").upsert({
+      ig_user_id: s.igUserId,
+      voice_samples: s.voiceSamples,
+      brand_notes: s.brandNotes,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  }
 }
 
 /* ---------- In-memory / env-JSON implementation (no database) ---------- */
@@ -237,6 +266,7 @@ export class MemoryStore implements Store {
   private activity: ActivityRecord[] = [];
   private accounts = new Map<string, IgAccount>();
   private conversations = new Map<string, Conversation>();
+  private settings = new Map<string, AccountSettings>();
 
   constructor(seed: Automation[] = []) {
     this.automations = [...seed];
@@ -292,6 +322,12 @@ export class MemoryStore implements Store {
       .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
       .slice(0, limit);
   }
+  async getSettings(igUserId: string) {
+    return this.settings.get(igUserId) ?? null;
+  }
+  async upsertSettings(s: AccountSettings) {
+    this.settings.set(s.igUserId, s);
+  }
 }
 
 /** Parses AUTOMATIONS_JSON so a deployment can run without a database. */
@@ -315,6 +351,8 @@ export function automationsFromEnv(json: string): Automation[] {
     emailPrompt: a.emailPrompt ?? "",
     emailRetryText: a.emailRetryText ?? "",
     ghlTags: a.ghlTags ?? [],
+    intentDescription: a.intentDescription ?? "",
+    aiFaq: a.aiFaq ?? "",
   }));
 }
 

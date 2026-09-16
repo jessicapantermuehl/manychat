@@ -51,6 +51,8 @@ function automation(overrides: Partial<Automation>): Automation {
     emailPrompt: "",
     emailRetryText: "",
     ghlTags: [],
+    intentDescription: "",
+    aiFaq: "",
     ...overrides,
   };
 }

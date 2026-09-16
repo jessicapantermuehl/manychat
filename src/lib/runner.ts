@@ -1,7 +1,8 @@
+import { getAi, type Ai } from "./ai";
 import { env, hasGhl } from "./env";
 import { GhlApiError, GhlClient } from "./ghl";
 import { buildDmMessage, InstagramApiError, InstagramClient } from "./instagram";
-import { findAutomation, pickRandom, renderTemplate } from "./matching";
+import { eligibleAutomations, findAutomation, pickPreferred, pickRandom, renderTemplate } from "./matching";
 import type { Store } from "./store";
 import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent } from "./types";
 import { extractEmail } from "./webhook";
@@ -12,6 +13,8 @@ export interface RunnerDeps {
   clientFor: (igUserId: string) => Promise<InstagramClient | null>;
   /** Builds the CRM client, or null when GoHighLevel is not configured. */
   ghlClient?: () => GhlClient | null;
+  /** The AI, or null when ANTHROPIC_API_KEY is not set. */
+  ai?: () => Ai | null;
   random?: () => number;
   log?: (msg: string, extra?: unknown) => void;
 }
@@ -26,6 +29,10 @@ export async function defaultClientFor(store: Store, igUserId: string): Promise<
 
 export function defaultGhlClient(): GhlClient | null {
   return hasGhl() ? new GhlClient(env.ghlApiKey, env.ghlLocationId) : null;
+}
+
+export function defaultAi(): Ai | null {
+  return getAi();
 }
 
 const PRIVATE_REPLY_WINDOW_SECONDS = 7 * 24 * 60 * 60;
@@ -72,19 +79,50 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
     return finish({ ...base, automationId: null, status: "skipped", detail: "comment older than 7 days" });
   }
 
-  // 4. Find a matching automation.
+  // 4. Find a matching automation: keywords first, then AI intent matching as a fallback.
   const automations = await store.listAutomations(event.igUserId);
-  const automation = findAutomation(event, automations);
-  if (!automation) {
-    return finish({ ...base, automationId: null, status: "skipped", detail: "no matching automation" });
+  const ai = deps.ai?.() ?? null;
+  const voice = ai ? await store.getSettings(event.igUserId) : null;
+
+  // AI triage runs for every comment so the activity log doubles as an inbox. Never blocks the flow.
+  const triagePromise = ai && event.text.trim()
+    ? ai.triageComment(event.text, voice).catch((err) => {
+        log("triage failed", err);
+        return null;
+      })
+    : Promise.resolve(null);
+  const withTriage = async (record: ActivityRecord): Promise<ActivityRecord> => {
+    const triage = await triagePromise;
+    return triage ? { ...record, category: triage.category, suggestedReply: triage.suggestedReply } : record;
+  };
+
+  let automation = findAutomation(event, automations);
+  let matchedBy = "keyword";
+  if (!automation && ai) {
+    const candidates = eligibleAutomations(event, automations).filter((a) => a.intentDescription.trim());
+    if (candidates.length > 0 && event.text.trim()) {
+      try {
+        const id = await ai.classifyIntent(
+          event.text,
+          candidates.map((a) => ({ id: a.id, name: a.name, intentDescription: a.intentDescription })),
+        );
+        automation = pickPreferred(candidates.filter((a) => a.id === id));
+        matchedBy = "intent";
+      } catch (err) {
+        log("intent matching failed", err);
+      }
+    }
   }
+  if (!automation) {
+    return finish(await withTriage({ ...base, automationId: null, status: "skipped", detail: "no matching automation" }));
+  }
+  const details: string[] = matchedBy === "intent" ? ["matched by AI intent"] : [];
 
   const client = await deps.clientFor(event.igUserId);
   if (!client) {
-    return finish({ ...base, automationId: automation.id, status: "failed", detail: "no access token for this account" });
+    return finish(await withTriage({ ...base, automationId: automation.id, status: "failed", detail: "no access token for this account" }));
   }
 
-  const details: string[] = [];
   const vars = { username: event.fromUsername, link: automation.dmLink ?? "" };
 
   // 5. Public reply under the comment (optional).
@@ -121,11 +159,11 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
       await client.sendPrivateReply(event.igUserId, event.commentId, message);
       details.push("DM sent");
     }
-    return finish({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") });
+    return finish(await withTriage({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") }));
   } catch (err) {
     details.push(`DM failed: ${describeError(err)}`);
     log("DM failed", err);
-    return finish({ ...base, automationId: automation.id, status: "failed", detail: details.join("; ") });
+    return finish(await withTriage({ ...base, automationId: automation.id, status: "failed", detail: details.join("; ") }));
   }
 }
 
@@ -173,17 +211,30 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
   const vars = { username: conversation.username, link: automation.dmLink ?? "" };
   const email = extractEmail(event.text);
 
-  // No email in the reply: ask once more, then give up quietly.
+  // No email in the reply: answer their question from the FAQ if we can, ask again, then give up quietly.
   if (!email) {
-    if (conversation.attempts >= MAX_EMAIL_ATTEMPTS) {
+    const ai = deps.ai?.() ?? null;
+    const faqEnabled = Boolean(ai && automation.aiFaq.trim());
+    const maxAttempts = faqEnabled ? MAX_EMAIL_ATTEMPTS + 1 : MAX_EMAIL_ATTEMPTS;
+    if (conversation.attempts >= maxAttempts) {
       await save({ state: "abandoned" });
       return finish({ ...base, automationId: automation.id, status: "skipped", detail: "no email after retry; conversation closed" });
     }
     const retry = automation.emailRetryText.trim() || "I didn't catch an email address. Could you send it again?";
+    let answer: string | null = null;
+    if (faqEnabled && ai) {
+      try {
+        const voice = await store.getSettings(event.igUserId);
+        answer = await ai.answerFromFaq(event.text, automation.aiFaq, voice);
+      } catch (err) {
+        log("FAQ answer failed", err);
+      }
+    }
     try {
-      await client.sendMessage(event.igUserId, event.senderId, { text: renderTemplate(retry, vars).slice(0, 1000) });
+      const text = answer ? `${answer}\n\n${renderTemplate(retry, vars)}` : renderTemplate(retry, vars);
+      await client.sendMessage(event.igUserId, event.senderId, { text: text.slice(0, 1000) });
       await save({ attempts: conversation.attempts + 1 });
-      return finish({ ...base, automationId: automation.id, status: "sent", detail: "asked for email again" });
+      return finish({ ...base, automationId: automation.id, status: "sent", detail: answer ? "answered from FAQ and asked for email again" : "asked for email again" });
     } catch (err) {
       log("retry DM failed", err);
       return finish({ ...base, automationId: automation.id, status: "failed", detail: `retry DM failed: ${describeError(err)}` });

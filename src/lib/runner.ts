@@ -1,4 +1,4 @@
-import { getAi, type Ai } from "./ai";
+import { getAi, type Ai, type Triage } from "./ai";
 import { env, hasGhl } from "./env";
 import { GhlApiError, GhlClient } from "./ghl";
 import { buildDmMessage, buildQuickReplyMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
@@ -112,17 +112,24 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
   const voice = ai ? await store.getSettings(event.igUserId) : null;
 
   // AI triage runs for every comment so the activity log doubles as an inbox. Never blocks the flow.
-  const triagePromise = ai && event.text.trim()
-    ? ai.triageComment(event.text, voice).catch((err) => {
-        log("triage failed", err);
-        return null;
-      })
-    : Promise.resolve(null);
+  const triagePromise: Promise<{ triage: Triage | null; error: string | null }> = ai && event.text.trim()
+    ? ai
+        .triageComment(event.text, voice)
+        .then((triage) => ({ triage, error: null }))
+        .catch((err) => {
+          log("triage failed", err);
+          return { triage: null, error: describeError(err) };
+        })
+    : Promise.resolve({ triage: null, error: null });
+  // Attach the triage result, or surface the AI error in the detail so the dashboard shows why the Type column is blank.
   const withTriage = async (record: ActivityRecord): Promise<ActivityRecord> => {
-    const triage = await triagePromise;
-    return triage ? { ...record, category: triage.category, suggestedReply: triage.suggestedReply } : record;
+    const { triage, error } = await triagePromise;
+    if (triage) return { ...record, category: triage.category, suggestedReply: triage.suggestedReply };
+    if (error) return { ...record, detail: `${record.detail}; AI triage failed: ${error}` };
+    return record;
   };
 
+  const details: string[] = [];
   let automation = findAutomation(event, automations);
   let matchedBy = "keyword";
   if (!automation && ai) {
@@ -137,13 +144,14 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
         matchedBy = "intent";
       } catch (err) {
         log("intent matching failed", err);
+        details.push(`AI intent matching failed: ${describeError(err)}`);
       }
     }
   }
   if (!automation) {
-    return finish(await withTriage({ ...base, automationId: null, status: "skipped", detail: "no matching automation" }));
+    return finish(await withTriage({ ...base, automationId: null, status: "skipped", detail: ["no matching automation", ...details].join("; ") }));
   }
-  const details: string[] = matchedBy === "intent" ? ["matched by AI intent"] : [];
+  if (matchedBy === "intent") details.push("matched by AI intent");
 
   const client = await deps.clientFor(event.igUserId);
   if (!client) {
@@ -441,6 +449,10 @@ export async function handleMessageEvents(events: MessageEvent[], deps: RunnerDe
 }
 
 function describeError(err: unknown): string {
+  if (err && typeof err === "object" && "status" in err && "message" in err && (err as { name?: string }).name?.endsWith("Error") && !(err instanceof InstagramApiError) && !(err instanceof GhlApiError)) {
+    const e = err as { status?: number; message: string };
+    return e.status ? `${e.message} (HTTP ${e.status})` : e.message;
+  }
   if (err instanceof InstagramApiError) {
     const code = [err.code, err.subcode].filter((x) => x !== undefined).join("/");
     return `${err.message}${code ? ` (code ${code})` : ""}`;

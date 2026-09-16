@@ -179,3 +179,18 @@ describe("AI FAQ answers during email capture", () => {
     expect(ai.calls.some((c) => c.startsWith("faq:"))).toBe(false);
   });
 });
+
+describe("AI failures are visible in the log", () => {
+  it("appends the triage error to the detail instead of hiding it", async () => {
+    const store = new MemoryStore([rule]);
+    const ig = fakeInstagram();
+    const ai = fakeAi({
+      triageComment: async () => {
+        throw Object.assign(new Error("invalid x-api-key"), { name: "AuthenticationError", status: 401 });
+      },
+    });
+    const result = await handleCommentEvent(comment("guide"), { store, clientFor: async () => ig.client, ai: () => ai });
+    expect(result.status).toBe("sent");
+    expect(result.detail).toContain("AI triage failed: invalid x-api-key (HTTP 401)");
+  });
+});

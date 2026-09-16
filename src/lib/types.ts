@@ -108,6 +108,10 @@ export interface Conversation {
   ghlContactId: string | null;
   /** Last inbound message id we acted on, so a redelivered webhook is ignored. */
   lastMessageId?: string | null;
+  /** Why the conversation closed. "declined" (a soft no) can be reopened once; "stopped" never. */
+  closedReason?: "declined" | "stopped" | "expired" | "no_response" | "error" | null;
+  /** True once we have re-sent the opt-in question after a change of mind. */
+  reopened?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

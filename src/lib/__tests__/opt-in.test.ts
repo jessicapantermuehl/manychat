@@ -104,7 +104,7 @@ describe("opt-in flow", () => {
       const before = ig.calls.length;
       const result = await handleMessageEvent(reply, deps);
       expect(result?.status).toBe("skipped");
-      expect(result?.detail).toContain("declined");
+      expect(result?.detail).toMatch(/declined|asked to stop/);
       expect(ig.calls.length).toBe(before);
       expect((await store.getConversation("acct", "igsid-42"))?.state).toBe("abandoned");
     }
@@ -150,7 +150,7 @@ describe("opt-in flow", () => {
     await handleCommentEvent(comment, deps);
     await handleMessageEvent(tap(OPT_IN_YES), deps);
     const result = await handleMessageEvent(dm("unsubscribe"), deps);
-    expect(result?.detail).toContain("declined");
+    expect(result?.detail).toBe("asked to stop; conversation closed");
   });
 
   it("ignores a redelivered webhook for the same message", async () => {
@@ -203,5 +203,54 @@ describe("parseMessageEvents with taps", () => {
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({ senderId: "u1", messageId: "m1", text: "Yes please!", payload: OPT_IN_YES });
     expect(events[1]).toMatchObject({ senderId: "u2", messageId: "p1", text: "Yes", payload: OPT_IN_YES });
+  });
+});
+
+describe("changing their mind after No", () => {
+  it("re-sends the opt-in question once after an accidental No, then delivers on Yes", async () => {
+    const store = new MemoryStore([rule]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    await handleMessageEvent(tap(OPT_IN_NO), deps);
+
+    const oops = await handleMessageEvent(dm("wait, I do want it!"), deps);
+    expect(oops?.detail).toBe("changed their mind; asked for opt-in again");
+    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(2);
+    expect((await store.getConversation("acct", "igsid-42"))?.state).toBe("awaiting_optin");
+
+    const yes = await handleMessageEvent(tap(OPT_IN_YES), deps);
+    expect(yes?.detail).toBe("opted in; link sent");
+  });
+
+  it("only reopens once", async () => {
+    const store = new MemoryStore([rule]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    await handleMessageEvent(tap(OPT_IN_NO), deps);
+    await handleMessageEvent(dm("oops actually yes"), deps);
+    await handleMessageEvent(tap(OPT_IN_NO), deps);
+    const before = ig.calls.length;
+    const again = await handleMessageEvent(dm("oops actually yes"), deps);
+    expect(again).toBeNull();
+    expect(ig.calls.length).toBe(before);
+  });
+
+  it("never reopens after a stop word, and ignores unrelated chatter after a No", async () => {
+    const store = new MemoryStore([rule]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    await handleMessageEvent(dm("stop"), deps);
+    expect(await handleMessageEvent(dm("actually yes please"), deps)).toBeNull();
+
+    const store2 = new MemoryStore([rule]);
+    const deps2 = { store: store2, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps2);
+    await handleMessageEvent(tap(OPT_IN_NO), deps2);
+    const before = ig.calls.length;
+    expect(await handleMessageEvent(dm("love your reels btw"), deps2)).toBeNull();
+    expect(ig.calls.length).toBe(before);
   });
 });

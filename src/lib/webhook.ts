@@ -122,13 +122,30 @@ export function extractEmail(text: string): string | null {
 
 /** "yes", "yes please!!", "sure", "send it", "ok" ... */
 const YES_PATTERN = /^[^\p{L}\p{N}]*(y+e+s+|yea+h*|yep|yup|sure|ok(ay)?|please|send( it| me)?|i want it|absolutely|definitely|👍|✅|🙌|💌|❤️|🙏)(?![\p{L}\p{N}])/iu;
-/** "no", "no thanks", "stop", "unsubscribe" ... */
-const NO_PATTERN = /^[^\p{L}\p{N}]*(no+( thanks| thank you| ty)?|nope|nah|stop|unsubscribe|cancel|leave me alone|not interested|don'?t)(?![\p{L}\p{N}])/iu;
+/** A soft no: "no", "no thanks", "nope", "not interested". Can be reopened if they change their mind. */
+const NO_PATTERN = /^[^\p{L}\p{N}]*(no+( thanks| thank you| ty)?|nope|nah|not interested|not now|maybe later)(?![\p{L}\p{N}])/iu;
+/** A hard stop: never message again, whatever they say afterwards. */
+const STOP_PATTERN = /^[^\p{L}\p{N}]*(stop|unsubscribe|cancel|opt out|leave me alone|don'?t (message|dm|text|contact)|go away|block)(?![\p{L}\p{N}])/iu;
+/** "wait", "oops", "actually yes", "changed my mind", "I meant yes" ... */
+const CHANGED_MIND_PATTERN = /\b(wait|oops|whoops|sorry|actually|accident|by mistake|changed my mind|meant (to|yes)|do want|i want|can i still|still (want|get)|send it)\b/iu;
 
 export function looksLikeYes(text: string): boolean {
   return YES_PATTERN.test(text.trim());
 }
 
+/** Soft no or hard stop. */
 export function looksLikeNo(text: string): boolean {
-  return NO_PATTERN.test(text.trim());
+  const t = text.trim();
+  return NO_PATTERN.test(t) || STOP_PATTERN.test(t);
+}
+
+export function looksLikeStop(text: string): boolean {
+  return STOP_PATTERN.test(text.trim());
+}
+
+/** After a decline: does this message read as "oops, I do want it"? */
+export function looksLikeChangedMind(text: string): boolean {
+  const t = text.trim();
+  if (looksLikeNo(t)) return false;
+  return looksLikeYes(t) || CHANGED_MIND_PATTERN.test(t);
 }

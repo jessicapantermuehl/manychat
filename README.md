@@ -16,8 +16,10 @@ Instagram API with Instagram Login.
 3. It posts one of your public replies under the comment (optional) and sends **one** DM as an
    Instagram **private reply**: the opt-in question with **Yes, send it!** / **No thanks** buttons.
 4. When they tap Yes (or type "yes"), Meta opens the 24-hour messaging window and the app sends
-   the link, or the email question if email capture is on. "No", "stop" or "unsubscribe" ends the
-   conversation at any point, and an unclear reply gets one reminder before the app goes quiet.
+   the link, or the email question if email capture is on. "No thanks" closes the conversation,
+   but if they then write something like "wait, I do want it" the question is sent once more.
+   "Stop" or "unsubscribe" closes it for good. An unclear reply gets one reminder before the app
+   goes quiet.
 5. Every comment and reply is logged on the dashboard as `sent`, `skipped`, `failed` or `captured`
    with the reason.
 

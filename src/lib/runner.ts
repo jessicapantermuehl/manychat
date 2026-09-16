@@ -5,7 +5,7 @@ import { buildDmMessage, buildQuickReplyMessage, InstagramApiError, InstagramCli
 import { eligibleAutomations, findAutomation, pickPreferred, pickRandom, renderTemplate } from "./matching";
 import type { Store } from "./store";
 import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent } from "./types";
-import { extractEmail, looksLikeNo, looksLikeYes } from "./webhook";
+import { extractEmail, looksLikeChangedMind, looksLikeNo, looksLikeStop, looksLikeYes } from "./webhook";
 
 export interface RunnerDeps {
   store: Store;
@@ -195,6 +195,8 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
       email: null,
       ghlContactId: null,
       lastMessageId: null,
+      closedReason: null,
+      reopened: false,
     });
     return finish(await withTriage({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") }));
   } catch (err) {
@@ -214,9 +216,15 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
 
   const conversation = await store.getConversation(event.igUserId, event.senderId);
   if (!conversation) return null;
-  if (conversation.state === "done" || conversation.state === "abandoned") return null;
+  if (conversation.state === "done") return null;
   // Meta can redeliver a webhook; never act on the same message twice.
   if (conversation.lastMessageId && conversation.lastMessageId === event.messageId) return null;
+  // A closed conversation stays closed, with one exception: they tapped No by accident and say so.
+  if (conversation.state === "abandoned") {
+    const canReopen = conversation.closedReason === "declined" && !conversation.reopened && !event.payload && looksLikeChangedMind(event.text);
+    if (!canReopen) return null;
+    return reopenAfterDecline(event, conversation, deps);
+  }
 
   const base = {
     commentId: conversation.commentId,
@@ -237,20 +245,24 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
   // Too old: stop listening so a message weeks later does not trigger anything.
   const startedAt = conversation.createdAt ? Date.parse(conversation.createdAt) : Date.now();
   if (Date.now() - startedAt > CONVERSATION_TTL_MS) {
-    await save({ state: "abandoned" });
+    await save({ state: "abandoned", closedReason: "expired" });
     return finish({ ...base, automationId: conversation.automationId, status: "skipped", detail: "conversation expired" });
   }
 
-  // An explicit no or a stop word ends the conversation immediately, in any state.
+  // A stop word ends the conversation for good; a plain no closes it but can be reopened once.
+  if (!event.payload && looksLikeStop(event.text)) {
+    await save({ state: "abandoned", closedReason: "stopped" });
+    return finish({ ...base, automationId: conversation.automationId, status: "skipped", detail: "asked to stop; conversation closed" });
+  }
   if (event.payload === OPT_IN_NO || (!event.payload && looksLikeNo(event.text))) {
-    await save({ state: "abandoned" });
+    await save({ state: "abandoned", closedReason: "declined" });
     return finish({ ...base, automationId: conversation.automationId, status: "skipped", detail: "declined; conversation closed" });
   }
 
   const automation = await store.getAutomation(conversation.automationId);
   const client = await deps.clientFor(event.igUserId);
   if (!automation || !client) {
-    await save({ state: "abandoned" });
+    await save({ state: "abandoned", closedReason: "error" });
     return finish({ ...base, automationId: conversation.automationId, status: "failed", detail: automation ? "no access token for this account" : "automation no longer exists" });
   }
 
@@ -258,6 +270,33 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
     return handleOptInReply(event, conversation, automation, client, deps, base, finish, save);
   }
   return handleEmailReply(event, conversation, automation, client, deps, base, finish, save);
+}
+
+/** They tapped No, then said "wait, I do want it": send the opt-in question once more. */
+async function reopenAfterDecline(event: MessageEvent, conversation: Conversation, deps: RunnerDeps): Promise<ActivityRecord | null> {
+  const { store } = deps;
+  const log = deps.log ?? (() => {});
+  const base = { commentId: conversation.commentId, igUserId: event.igUserId, fromUsername: conversation.username, commentText: event.text };
+  const automation = await store.getAutomation(conversation.automationId);
+  const client = await deps.clientFor(event.igUserId);
+  // Only opt-in automations have a question to re-send.
+  if (!automation || !client || !automation.requireOptIn) return null;
+
+  const record: ActivityRecord = { ...base, automationId: automation.id, status: "sent", detail: "changed their mind; asked for opt-in again" };
+  try {
+    await client.sendMessage(event.igUserId, event.senderId, optInMessage(automation, conversation.username));
+    await store.upsertConversation({ ...conversation, state: "awaiting_optin", attempts: 1, closedReason: null, reopened: true, lastMessageId: event.messageId });
+  } catch (err) {
+    log("reopen DM failed", err);
+    record.status = "failed";
+    record.detail = `re-sending opt-in failed: ${describeError(err)}`;
+  }
+  try {
+    await store.recordActivity(record);
+  } catch (err) {
+    log("failed to record activity", err);
+  }
+  return record;
 }
 
 type Finish = (r: ActivityRecord) => Promise<ActivityRecord>;
@@ -280,7 +319,7 @@ async function handleOptInReply(
   if (!saidYes) {
     // Anything else: ask once more with the buttons, then go quiet.
     if (conversation.attempts >= MAX_OPTIN_ATTEMPTS) {
-      await save({ state: "abandoned" });
+      await save({ state: "abandoned", closedReason: "no_response" });
       return finish({ ...base, automationId: automation.id, status: "skipped", detail: "no opt-in after reminder; conversation closed" });
     }
     try {
@@ -330,7 +369,7 @@ async function handleEmailReply(
     const faqEnabled = Boolean(ai && automation.aiFaq.trim());
     const maxAttempts = faqEnabled ? MAX_EMAIL_ATTEMPTS + 1 : MAX_EMAIL_ATTEMPTS;
     if (conversation.attempts >= maxAttempts) {
-      await save({ state: "abandoned" });
+      await save({ state: "abandoned", closedReason: "no_response" });
       return finish({ ...base, automationId: automation.id, status: "skipped", detail: "no email after retry; conversation closed" });
     }
     const retry = automation.emailRetryText.trim() || "I didn't catch an email address. Could you send it again?";

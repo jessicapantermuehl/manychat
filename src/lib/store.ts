@@ -65,6 +65,8 @@ type ConversationRow = {
   email: string | null;
   ghl_contact_id: string | null;
   last_message_id: string | null;
+  closed_reason: Conversation["closedReason"];
+  reopened: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -81,6 +83,8 @@ function rowToConversation(r: ConversationRow): Conversation {
     email: r.email,
     ghlContactId: r.ghl_contact_id,
     lastMessageId: r.last_message_id,
+    closedReason: r.closed_reason ?? null,
+    reopened: r.reopened ?? false,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -243,6 +247,8 @@ export class SupabaseStore implements Store {
       email: c.email,
       ghl_contact_id: c.ghlContactId,
       last_message_id: c.lastMessageId ?? null,
+      closed_reason: c.closedReason ?? null,
+      reopened: c.reopened ?? false,
       updated_at: new Date().toISOString(),
     });
     if (error) throw error;

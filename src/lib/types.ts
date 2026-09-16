@@ -27,6 +27,17 @@ export interface Automation {
   dmButtonTitle: string | null;
   /** Ignore comments that are replies to other comments. */
   ignoreReplies: boolean;
+  /**
+   * When true the first DM asks for an email address instead of sending the link.
+   * Once the person replies with an email, it is pushed to GoHighLevel and dmText (with the link) is sent.
+   */
+  collectEmail: boolean;
+  /** The DM that asks for the email. Supports {{username}}. */
+  emailPrompt: string;
+  /** Sent once if the reply did not contain an email address. */
+  emailRetryText: string;
+  /** Tags added to the GoHighLevel contact. */
+  ghlTags: string[];
   /** Whether the rule is live. */
   active: boolean;
   createdAt?: string;
@@ -48,7 +59,38 @@ export interface CommentEvent {
   time: number;
 }
 
-export type EventStatus = "sent" | "skipped" | "failed";
+/** One inbound DM from the messages webhook. */
+export interface MessageEvent {
+  /** IG user id of the account that received the message (entry.id). */
+  igUserId: string;
+  /** Instagram-scoped id of the person who sent it. */
+  senderId: string;
+  messageId: string;
+  text: string;
+  /** Unix timestamp in milliseconds from the webhook. */
+  timestamp: number;
+}
+
+export type ConversationState = "awaiting_email" | "done" | "abandoned";
+
+/** Tracks an email-capture conversation with one person. */
+export interface Conversation {
+  igUserId: string;
+  /** Instagram-scoped id used for messaging. */
+  igsid: string;
+  username: string;
+  automationId: string;
+  commentId: string;
+  state: ConversationState;
+  /** How many times we have asked for the email (prompt + retries). */
+  attempts: number;
+  email: string | null;
+  ghlContactId: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type EventStatus = "sent" | "skipped" | "failed" | "captured";
 
 export interface ActivityRecord {
   id?: string;

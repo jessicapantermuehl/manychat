@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { defaultClientFor, handleCommentEvents } from "@/lib/runner";
+import { defaultClientFor, defaultGhlClient, handleCommentEvents, handleMessageEvents } from "@/lib/runner";
 import { getStore } from "@/lib/store";
-import { handleVerification, parseCommentEvents, verifySignature } from "@/lib/webhook";
+import { handleVerification, parseCommentEvents, parseMessageEvents, verifySignature } from "@/lib/webhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,15 +32,21 @@ export async function POST(req: Request) {
 
   if (env.debugWebhooks) console.log("[webhook]", rawBody);
 
-  const events = parseCommentEvents(payload);
+  const comments = parseCommentEvents(payload);
+  const messages = parseMessageEvents(payload);
   const store = getStore();
+  const deps = {
+    store,
+    clientFor: (igUserId: string) => defaultClientFor(store, igUserId),
+    ghlClient: defaultGhlClient,
+    log: (msg: string, extra?: unknown) => console.error("[ConvertlySocial]", msg, extra),
+  };
 
   // Meta expects a 200 quickly; the API calls are fast enough to do inline on a serverless function.
-  const results = await handleCommentEvents(events, {
-    store,
-    clientFor: (igUserId) => defaultClientFor(store, igUserId),
-    log: (msg, extra) => console.error("[ConvertlySocial]", msg, extra),
-  });
+  const results = [...(await handleCommentEvents(comments, deps)), ...(await handleMessageEvents(messages, deps))];
 
-  return NextResponse.json({ received: events.length, results: results.map((r) => ({ commentId: r.commentId, status: r.status, detail: r.detail })) });
+  return NextResponse.json({
+    received: comments.length + messages.length,
+    results: results.map((r) => ({ commentId: r.commentId, status: r.status, detail: r.detail })),
+  });
 }

@@ -22,6 +22,10 @@ export const env = {
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   /** Secret that Vercel cron sends in the Authorization header. */
   cronSecret: process.env.CRON_SECRET ?? "",
+  /** GoHighLevel private integration token (Settings → Private integrations, scope contacts.write). */
+  ghlApiKey: process.env.GHL_API_KEY ?? "",
+  /** GoHighLevel sub-account (location) id. */
+  ghlLocationId: process.env.GHL_LOCATION_ID ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   /** Optional JSON array of automations, used when Supabase is not configured. */
@@ -32,4 +36,8 @@ export const env = {
 
 export function hasSupabase(): boolean {
   return Boolean(env.supabaseUrl && env.supabaseServiceKey);
+}
+
+export function hasGhl(): boolean {
+  return Boolean(env.ghlApiKey && env.ghlLocationId);
 }

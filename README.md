@@ -16,7 +16,21 @@ Instagram API with Instagram Login.
 3. It posts one of your public replies under the comment (optional) and sends the DM as an
    Instagram **private reply**, which is allowed for 7 days after the comment, once per comment,
    without the person having messaged you first.
-4. Every comment is logged on the dashboard as `sent`, `skipped` or `failed` with the reason.
+4. Every comment is logged on the dashboard as `sent`, `skipped`, `failed` or `captured` with the reason.
+
+### Email capture → GoHighLevel
+
+Turn on **Ask for an email address before sending the link** in an automation and the flow becomes:
+
+1. Comment matches → public reply → DM asking for their email.
+2. They reply with an email → the contact is upserted in GoHighLevel (first name = Instagram
+   username, source = ConvertlySocial) and your tags are added → the DM with the link is sent.
+3. If the reply has no email, the app asks once more, then stops. Conversations expire after
+   3 days. People who never commented a keyword are never messaged.
+
+Captured emails appear in the **Leads** table on the dashboard even if GoHighLevel is not
+configured or the sync fails, so nothing is lost. In GHL, trigger a workflow off the tag to
+send the guide by email as well.
 
 ## One-time setup
 
@@ -33,8 +47,11 @@ Instagram API with Instagram Login.
    `https://YOUR-DOMAIN/api/instagram/callback`.
 7. Under **Configure webhooks** set the callback URL to
    `https://YOUR-DOMAIN/api/instagram/webhook`, choose a verify token (any random string),
-   and subscribe to the `comments` field. Save this only after the app is deployed
-   (step 3), because Meta verifies the URL immediately.
+   and subscribe to the `comments` **and** `messages` fields. Save this only after the app is
+   deployed (step 3), because Meta verifies the URL immediately.
+8. For email capture, Instagram must also let the app read your DMs: in the Instagram app go to
+   **Settings → Messages and story replies → Message controls → Connected tools** and turn on
+   **Allow access to messages**.
 
 The webhook fires for comments on your own posts, in Development mode as well, as long as the
 account that receives the comment is a tester on the app. To send DMs to the general public
@@ -44,8 +61,14 @@ screencast showing the comment → DM flow; this app's dashboard is what you rec
 
 ### 2. Supabase
 
-1. Create a project, open the **SQL editor** and run `supabase/migrations/0001_init.sql`.
+1. Create a project, open the **SQL editor** and run every file in `supabase/migrations/` in order.
 2. Copy the **Project URL** and the **service_role** key (Project settings → API).
+
+### 2b. GoHighLevel (only for email capture)
+
+1. In GHL open the sub-account → **Settings → Private integrations** → create one with the
+   `contacts.write` scope and copy the token into `GHL_API_KEY`.
+2. Copy the sub-account id from the URL (`/v2/location/<id>/...`) into `GHL_LOCATION_ID`.
 
 ### 3. Deploy to Vercel
 
@@ -104,8 +127,9 @@ src/app/api/instagram/callback  stores the long-lived token, subscribes webhooks
 src/app/api/cron/refresh-tokens weekly token refresh (Vercel cron)
 src/app                         dashboard: automations, post picker, activity log
 src/lib/instagram.ts            Instagram API client (private replies, comment replies, OAuth)
+src/lib/ghl.ts                  GoHighLevel client (contact upsert + tags)
 src/lib/matching.ts             keyword matching and rule selection
-src/lib/runner.ts               the comment → reply → DM pipeline
+src/lib/runner.ts               the comment → reply → DM pipeline and the email-capture DM handler
 src/lib/store.ts                Supabase store, plus an in-memory fallback
 supabase/migrations             database schema
 scripts/simulate-comment.ts     fires a signed fake webhook at a local server

@@ -26,6 +26,10 @@ const rule: Automation = {
   dmButtonTitle: null,
   ignoreReplies: true,
   active: true,
+  collectEmail: false,
+  emailPrompt: "",
+  emailRetryText: "",
+  ghlTags: [],
 };
 
 const event: CommentEvent = {

@@ -47,6 +47,10 @@ function automation(overrides: Partial<Automation>): Automation {
     dmButtonTitle: null,
     ignoreReplies: true,
     active: true,
+    collectEmail: false,
+    emailPrompt: "",
+    emailRetryText: "",
+    ghlTags: [],
     ...overrides,
   };
 }

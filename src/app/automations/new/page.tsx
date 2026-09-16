@@ -24,6 +24,10 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
         dmButtonTitle: null,
         ignoreReplies: true,
         active: true,
+        collectEmail: false,
+        emailPrompt: "",
+        emailRetryText: "",
+        ghlTags: [],
       }
     : undefined;
 

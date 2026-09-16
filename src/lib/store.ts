@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env, hasSupabase } from "./env";
-import type { ActivityRecord, Automation, IgAccount } from "./types";
+import type { ActivityRecord, Automation, Conversation, IgAccount } from "./types";
 
 export interface Store {
   listAutomations(igUserId?: string): Promise<Automation[]>;
@@ -16,6 +16,12 @@ export interface Store {
   getAccount(igUserId: string): Promise<IgAccount | null>;
   listAccounts(): Promise<IgAccount[]>;
   upsertAccount(account: IgAccount): Promise<void>;
+
+  /** Email-capture conversations, keyed by account + Instagram-scoped user id. */
+  getConversation(igUserId: string, igsid: string): Promise<Conversation | null>;
+  upsertConversation(conversation: Conversation): Promise<void>;
+  /** Captured leads, newest first. */
+  listLeads(limit?: number): Promise<Conversation[]>;
 }
 
 /* ---------- Supabase implementation ---------- */
@@ -33,8 +39,42 @@ type AutomationRow = {
   dm_button_title: string | null;
   ignore_replies: boolean;
   active: boolean;
+  collect_email: boolean;
+  email_prompt: string;
+  email_retry_text: string;
+  ghl_tags: string[];
   created_at: string;
 };
+
+type ConversationRow = {
+  ig_user_id: string;
+  igsid: string;
+  username: string;
+  automation_id: string;
+  comment_id: string;
+  state: Conversation["state"];
+  attempts: number;
+  email: string | null;
+  ghl_contact_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function rowToConversation(r: ConversationRow): Conversation {
+  return {
+    igUserId: r.ig_user_id,
+    igsid: r.igsid,
+    username: r.username,
+    automationId: r.automation_id,
+    commentId: r.comment_id,
+    state: r.state,
+    attempts: r.attempts,
+    email: r.email,
+    ghlContactId: r.ghl_contact_id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
 
 function rowToAutomation(r: AutomationRow): Automation {
   return {
@@ -50,6 +90,10 @@ function rowToAutomation(r: AutomationRow): Automation {
     dmButtonTitle: r.dm_button_title,
     ignoreReplies: r.ignore_replies,
     active: r.active,
+    collectEmail: r.collect_email ?? false,
+    emailPrompt: r.email_prompt ?? "",
+    emailRetryText: r.email_retry_text ?? "",
+    ghlTags: r.ghl_tags ?? [],
     createdAt: r.created_at,
   };
 }
@@ -85,6 +129,10 @@ export class SupabaseStore implements Store {
       dm_button_title: a.dmButtonTitle,
       ignore_replies: a.ignoreReplies,
       active: a.active,
+      collect_email: a.collectEmail,
+      email_prompt: a.emailPrompt,
+      email_retry_text: a.emailRetryText,
+      ghl_tags: a.ghlTags,
     };
     const { data, error } = await this.db.from("cs_automations").upsert(row).select("*").single();
     if (error) throw error;
@@ -152,6 +200,34 @@ export class SupabaseStore implements Store {
     });
     if (error) throw error;
   }
+
+  async getConversation(igUserId: string, igsid: string) {
+    const { data, error } = await this.db.from("cs_conversations").select("*").eq("ig_user_id", igUserId).eq("igsid", igsid).maybeSingle();
+    if (error) throw error;
+    return data ? rowToConversation(data as ConversationRow) : null;
+  }
+
+  async upsertConversation(c: Conversation) {
+    const { error } = await this.db.from("cs_conversations").upsert({
+      ig_user_id: c.igUserId,
+      igsid: c.igsid,
+      username: c.username,
+      automation_id: c.automationId,
+      comment_id: c.commentId,
+      state: c.state,
+      attempts: c.attempts,
+      email: c.email,
+      ghl_contact_id: c.ghlContactId,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  }
+
+  async listLeads(limit = 100) {
+    const { data, error } = await this.db.from("cs_conversations").select("*").eq("state", "done").order("updated_at", { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data as ConversationRow[]).map(rowToConversation);
+  }
 }
 
 /* ---------- In-memory / env-JSON implementation (no database) ---------- */
@@ -160,6 +236,7 @@ export class MemoryStore implements Store {
   private automations: Automation[];
   private activity: ActivityRecord[] = [];
   private accounts = new Map<string, IgAccount>();
+  private conversations = new Map<string, Conversation>();
 
   constructor(seed: Automation[] = []) {
     this.automations = [...seed];
@@ -201,6 +278,20 @@ export class MemoryStore implements Store {
   async upsertAccount(a: IgAccount) {
     this.accounts.set(a.igUserId, a);
   }
+  async getConversation(igUserId: string, igsid: string) {
+    return this.conversations.get(`${igUserId}:${igsid}`) ?? null;
+  }
+  async upsertConversation(c: Conversation) {
+    const now = new Date().toISOString();
+    const existing = this.conversations.get(`${c.igUserId}:${c.igsid}`);
+    this.conversations.set(`${c.igUserId}:${c.igsid}`, { ...c, createdAt: existing?.createdAt ?? now, updatedAt: now });
+  }
+  async listLeads(limit = 100) {
+    return [...this.conversations.values()]
+      .filter((c) => c.state === "done")
+      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
+      .slice(0, limit);
+  }
 }
 
 /** Parses AUTOMATIONS_JSON so a deployment can run without a database. */
@@ -220,6 +311,10 @@ export function automationsFromEnv(json: string): Automation[] {
     dmButtonTitle: a.dmButtonTitle ?? null,
     ignoreReplies: a.ignoreReplies ?? true,
     active: a.active ?? true,
+    collectEmail: a.collectEmail ?? false,
+    emailPrompt: a.emailPrompt ?? "",
+    emailRetryText: a.emailRetryText ?? "",
+    ghlTags: a.ghlTags ?? [],
   }));
 }
 

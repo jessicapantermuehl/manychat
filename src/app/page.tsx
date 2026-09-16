@@ -1,5 +1,5 @@
 import { deleteAutomation, toggleAutomation } from "./actions";
-import { env, hasSupabase } from "@/lib/env";
+import { env, hasGhl, hasSupabase } from "@/lib/env";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,13 @@ export const dynamic = "force-dynamic";
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const params = await searchParams;
   const store = getStore();
-  const [automations, accounts, activity] = await Promise.all([store.listAutomations(), store.listAccounts(), store.listActivity(30)]);
+  const [automations, accounts, activity, leads] = await Promise.all([
+    store.listAutomations(),
+    store.listAccounts(),
+    store.listActivity(30),
+    store.listLeads(50),
+  ]);
+  const emailRulesExist = automations.some((a) => a.collectEmail);
 
   const webhookUrl = env.appUrl ? `${env.appUrl}/api/instagram/webhook` : "/api/instagram/webhook";
 
@@ -31,6 +37,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {!hasSupabase() && (
         <div className="notice bad">
           No database configured: automations live in memory (or AUTOMATIONS_JSON) and will reset on each deploy. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for persistence.
+        </div>
+      )}
+
+      {emailRulesExist && !hasGhl() && (
+        <div className="notice bad">
+          An automation collects emails but GoHighLevel is not configured. Emails are still saved here; set GHL_API_KEY and GHL_LOCATION_ID to push them to your CRM.
         </div>
       )}
 
@@ -87,6 +99,28 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                       </form>
                     </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Leads</h2>
+        {leads.length === 0 && <p className="muted">No emails captured yet. Turn on “Ask for an email address” in an automation.</p>}
+        {leads.length > 0 && (
+          <table>
+            <thead>
+              <tr><th>When</th><th>Instagram</th><th>Email</th><th>GoHighLevel</th></tr>
+            </thead>
+            <tbody>
+              {leads.map((l) => (
+                <tr key={`${l.igUserId}:${l.igsid}`}>
+                  <td className="muted">{l.updatedAt ? new Date(l.updatedAt).toLocaleString() : ""}</td>
+                  <td>@{l.username}</td>
+                  <td>{l.email}</td>
+                  <td>{l.ghlContactId ? <span className="pill sent">synced</span> : <span className="pill skipped">not synced</span>}</td>
                 </tr>
               ))}
             </tbody>

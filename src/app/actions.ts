@@ -35,6 +35,10 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
     dmButtonTitle: dmButtonTitle || null,
     ignoreReplies: form.get("ignoreReplies") === "on",
     active: form.get("active") === "on",
+    collectEmail: form.get("collectEmail") === "on",
+    emailPrompt: String(form.get("emailPrompt") ?? "").trim(),
+    emailRetryText: String(form.get("emailRetryText") ?? "").trim(),
+    ghlTags: commaList(form.get("ghlTags")),
   };
 }
 
@@ -43,6 +47,7 @@ export async function saveAutomation(form: FormData) {
   const data = parseForm(form);
   if (!data.igUserId) throw new Error("Choose an Instagram account first.");
   if (!data.dmText) throw new Error("The DM text is required.");
+  if (data.collectEmail && !data.emailPrompt) throw new Error("Write the message that asks for the email.");
   await getStore().upsertAutomation({ ...data, id });
   revalidatePath("/");
   redirect("/?saved=1");

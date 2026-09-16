@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { CommentEvent } from "./types";
+import type { CommentEvent, MessageEvent } from "./types";
 
 /** Verifies the X-Hub-Signature-256 header Meta sends with every webhook POST. */
 export function verifySignature(rawBody: string, signatureHeader: string | null, appSecret: string): boolean {
@@ -27,6 +27,12 @@ interface WebhookPayload {
   entry?: Array<{
     id?: string;
     time?: number;
+    messaging?: Array<{
+      sender?: { id?: string };
+      recipient?: { id?: string };
+      timestamp?: number;
+      message?: { mid?: string; text?: string; is_echo?: boolean };
+    }>;
     changes?: Array<{
       field?: string;
       value?: {
@@ -66,4 +72,36 @@ export function parseCommentEvents(payload: unknown): CommentEvent[] {
     }
   }
   return events;
+}
+
+/** Extracts inbound DMs from a webhook payload. Echoes of our own messages are ignored. */
+export function parseMessageEvents(payload: unknown): MessageEvent[] {
+  const body = payload as WebhookPayload;
+  if (!body || body.object !== "instagram" || !Array.isArray(body.entry)) return [];
+
+  const events: MessageEvent[] = [];
+  for (const entry of body.entry) {
+    if (!entry?.id || !Array.isArray(entry.messaging)) continue;
+    for (const m of entry.messaging) {
+      if (!m?.sender?.id || !m.message?.mid) continue;
+      if (m.message.is_echo) continue;
+      if (m.sender.id === String(entry.id)) continue;
+      events.push({
+        igUserId: String(entry.id),
+        senderId: String(m.sender.id),
+        messageId: String(m.message.mid),
+        text: m.message.text ?? "",
+        timestamp: typeof m.timestamp === "number" ? m.timestamp : Date.now(),
+      });
+    }
+  }
+  return events;
+}
+
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+/** Pulls the first email address out of free text, or null. */
+export function extractEmail(text: string): string | null {
+  const match = text.match(EMAIL_PATTERN);
+  return match ? match[0].toLowerCase().replace(/[.,;:!?]+$/, "") : null;
 }

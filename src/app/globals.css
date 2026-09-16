@@ -37,6 +37,7 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
 .pill.sent { background: #e3f3ea; color: var(--ok); }
 .pill.skipped { background: #f3efe3; color: var(--warn); }
 .pill.failed { background: #fbe4e2; color: var(--bad); }
+.pill.captured { background: #e3ecf9; color: #1f4e9c; }
 .notice { padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
 .notice.ok { background: #e3f3ea; color: var(--ok); }
 .notice.bad { background: #fbe4e2; color: var(--bad); }
@@ -52,3 +53,5 @@ textarea { min-height: 90px; resize: vertical; }
 .check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 code { background: #f0ece4; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+fieldset.group { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 12px; margin: 0; }
+fieldset.group legend { font-weight: 600; font-size: 14px; padding: 0 6px; }

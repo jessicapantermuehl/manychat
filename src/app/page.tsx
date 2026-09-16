@@ -15,8 +15,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <>
       <header className="top">
         <div>
-          <h1>Comment → DM</h1>
-          <div className="muted">Instagram comment automations</div>
+          <h1>ConvertlySocial</h1>
+          <div className="muted">Instagram comment → DM automations</div>
         </div>
         <div className="actions">
           <a className="btn secondary" href="/api/instagram/connect">Connect Instagram</a>

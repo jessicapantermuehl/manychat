@@ -1,4 +1,4 @@
--- Comment-to-DM schema. Run in the Supabase SQL editor or with `supabase db push`.
+-- ConvertlySocial schema. Run in the Supabase SQL editor or with `supabase db push`.
 
 create extension if not exists "pgcrypto";
 

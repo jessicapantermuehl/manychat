@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Comment to DM",
-  description: "Instagram comment-to-DM automations",
+  title: "ConvertlySocial",
+  description: "ConvertlySocial: Instagram comment-to-DM automations",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

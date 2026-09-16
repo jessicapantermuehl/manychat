@@ -1,8 +1,8 @@
 {
-  "name": "comment-to-dm",
+  "name": "convertlysocial",
   "version": "0.1.0",
   "private": true,
-  "description": "Instagram comment-to-DM automation (ManyChat-style) built on the Instagram API",
+  "description": "ConvertlySocial: Instagram comment-to-DM automation (ManyChat-style) built on the Instagram API",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

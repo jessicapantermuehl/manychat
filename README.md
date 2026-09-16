@@ -1,6 +1,6 @@
-# Comment → DM
+# ConvertlySocial
 
-A self-hosted "comment a keyword, get a DM" automation for Instagram, the same growth tool
+ConvertlySocial is a self-hosted "comment a keyword, get a DM" automation for Instagram, the same growth tool
 ManyChat sells. Someone comments **GUIDE** on your Reel, your account replies publicly
 ("Sent it to your DMs 💌") and privately sends them the link. No per-contact pricing, and
 your audience data stays in your own database.

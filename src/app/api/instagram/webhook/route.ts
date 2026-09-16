@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   const results = await handleCommentEvents(events, {
     store,
     clientFor: (igUserId) => defaultClientFor(store, igUserId),
-    log: (msg, extra) => console.error("[comment-to-dm]", msg, extra),
+    log: (msg, extra) => console.error("[ConvertlySocial]", msg, extra),
   });
 
   return NextResponse.json({ received: events.length, results: results.map((r) => ({ commentId: r.commentId, status: r.status, detail: r.detail })) });

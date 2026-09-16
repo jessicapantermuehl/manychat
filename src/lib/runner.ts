@@ -63,7 +63,13 @@ function optInMessage(automation: Automation, username: string): OutgoingMessage
 }
 
 function linkMessage(automation: Automation, username: string): OutgoingMessage {
-  return buildDmMessage(renderTemplate(automation.dmText, vars(username, automation)), automation.dmLink, automation.dmButtonTitle);
+  let text = renderTemplate(automation.dmText, vars(username, automation));
+  const link = automation.dmLink?.trim() ?? "";
+  // The link must reach them. If the text has no {{link}} and there is no button, append it.
+  if (link && !automation.dmButtonTitle?.trim() && !/\{\{\s*link\s*\}\}/i.test(automation.dmText) && !text.includes(link)) {
+    text = `${text.trimEnd()}\n\n${link}`;
+  }
+  return buildDmMessage(text, automation.dmLink, automation.dmButtonTitle);
 }
 
 function emailPromptMessage(automation: Automation, username: string): OutgoingMessage {

@@ -271,3 +271,31 @@ describe("{{offer}} personalisation", () => {
     expect(ig.calls[0].body.message.text).toBe("Hey fan! Just to confirm, would you like me to send you the link?");
   });
 });
+
+describe("link delivery", () => {
+  it("appends the link when the DM text forgets the {{link}} placeholder", async () => {
+    const store = new MemoryStore([{ ...rule, dmText: "Sure thing, here's your {{offer}}:" }]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    await handleMessageEvent(tap(OPT_IN_YES), deps);
+    expect(ig.calls.at(-1)!.body.message.text).toBe("Sure thing, here's your Gut Guide:\n\nhttps://example.com/guide");
+  });
+
+  it("does not append it when a button carries the link or the text already has it", async () => {
+    const withButton = new MemoryStore([{ ...rule, dmText: "Tap below", dmButtonTitle: "Open" }]);
+    const ig = fakeInstagram();
+    const deps = { store: withButton, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    await handleMessageEvent(tap(OPT_IN_YES), deps);
+    const last = ig.calls.at(-1)!.body.message as { attachment?: { payload: { text: string } } };
+    expect(last.attachment?.payload.text).toBe("Tap below");
+
+    const withPlaceholder = new MemoryStore([{ ...rule, dmText: "Here: {{link}}" }]);
+    const ig2 = fakeInstagram();
+    const deps2 = { store: withPlaceholder, clientFor: async () => ig2.client };
+    await handleCommentEvent(comment, deps2);
+    await handleMessageEvent(tap(OPT_IN_YES), deps2);
+    expect(ig2.calls.at(-1)!.body.message.text).toBe("Here: https://example.com/guide");
+  });
+});

@@ -44,6 +44,8 @@ const rule: Automation = {
   emailPrompt: "Hey {{username}}, what's your email?",
   emailRetryText: "Just the email please",
   ghlTags: ["instagram", "guide"],
+  deliverByEmailOnly: false,
+  emailSentText: "",
   intentDescription: "",
   aiFaq: "",
   requireOptIn: false,
@@ -168,5 +170,35 @@ describe("parseMessageEvents", () => {
     const events = parseMessageEvents(payload);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ igUserId: "acct", senderId: "igsid-42", messageId: "m1", text: "me@x.io" });
+  });
+});
+
+describe("deliver by email only", () => {
+  const emailOnly: Automation = { ...rule, deliverByEmailOnly: true, emailSentText: "Sent to your inbox, {{username}}!", offerName: "Guide" };
+
+  it("confirms instead of sending the link once the CRM has the contact", async () => {
+    const store = new MemoryStore([emailOnly]);
+    const ig = fakeInstagram();
+    const ghl = fakeGhl();
+    await handleCommentEvent(comment, { store, clientFor: async () => ig.client });
+    const result = await handleMessageEvent(dm("fan@example.com"), { store, clientFor: async () => ig.client, ghlClient: () => ghl.client });
+
+    expect(result?.status).toBe("captured");
+    expect(result?.detail).toContain("confirmation sent; delivery by email");
+    const last = ig.calls.at(-1)!.body as { message: { text: string } };
+    expect(last.message.text).toBe("Sent to your inbox, fan!");
+    expect(last.message.text).not.toContain("https://");
+  });
+
+  it("falls back to the link when the CRM sync fails or is not configured", async () => {
+    for (const ghlClient of [() => fakeGhl({ fail: true }).client, () => null]) {
+      const store = new MemoryStore([emailOnly]);
+      const ig = fakeInstagram();
+      await handleCommentEvent(comment, { store, clientFor: async () => ig.client });
+      const result = await handleMessageEvent(dm("fan@example.com"), { store, clientFor: async () => ig.client, ghlClient });
+      expect(result?.detail).toContain("sent link instead");
+      const last = ig.calls.at(-1)!.body as { message: { text: string } };
+      expect(last.message.text).toContain("https://example.com/guide");
+    }
   });
 });

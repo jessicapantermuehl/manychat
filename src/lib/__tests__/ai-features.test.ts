@@ -53,6 +53,8 @@ const rule: Automation = {
   emailPrompt: "",
   emailRetryText: "Just the email please",
   ghlTags: [],
+  deliverByEmailOnly: false,
+  emailSentText: "",
   intentDescription: "someone asking for the gut health guide",
   aiFaq: "",
   requireOptIn: false,

@@ -41,6 +41,8 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
     emailPrompt: String(form.get("emailPrompt") ?? "").trim(),
     emailRetryText: String(form.get("emailRetryText") ?? "").trim(),
     ghlTags: commaList(form.get("ghlTags")),
+    deliverByEmailOnly: form.get("deliverByEmailOnly") === "on",
+    emailSentText: String(form.get("emailSentText") ?? "").trim(),
     intentDescription: String(form.get("intentDescription") ?? "").trim(),
     aiFaq: String(form.get("aiFaq") ?? "").trim(),
     requireOptIn: form.get("requireOptIn") === "on",

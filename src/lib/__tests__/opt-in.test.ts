@@ -32,6 +32,8 @@ const rule: Automation = {
   emailPrompt: "What's your email?",
   emailRetryText: "Just the email please",
   ghlTags: [],
+  deliverByEmailOnly: false,
+  emailSentText: "",
   intentDescription: "",
   aiFaq: "",
   requireOptIn: true,

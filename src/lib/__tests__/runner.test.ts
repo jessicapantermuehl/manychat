@@ -31,6 +31,8 @@ const rule: Automation = {
   emailPrompt: "",
   emailRetryText: "",
   ghlTags: [],
+  deliverByEmailOnly: false,
+  emailSentText: "",
   intentDescription: "",
   aiFaq: "",
   requireOptIn: false,

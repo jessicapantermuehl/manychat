@@ -48,6 +48,7 @@ export const OPT_IN_NO = "CS_OPTIN_NO";
 const DEFAULT_OPT_IN_PROMPT = "Hey {{username}}! Thanks so much for asking for the {{offer}}. Just to confirm, would you like me to send you the link?";
 const DEFAULT_OPT_IN_PROMPT_NO_OFFER = "Hey {{username}}! Just to confirm, would you like me to send you the link?";
 const DEFAULT_OPT_IN_BUTTON = "Yes please!";
+const DEFAULT_EMAIL_SENT_TEXT = "Done! Your {{offer}} is on its way to your inbox, {{username}}. Give it a couple of minutes, and check spam or promotions if it's not there 💌";
 
 function vars(username: string, automation: Automation) {
   return { username, link: automation.dmLink ?? "", offer: automation.offerName.trim() };
@@ -425,9 +426,18 @@ async function handleEmailReply(
     details.push("GHL not configured");
   }
 
+  // Deliver by email only when the CRM has the contact; otherwise fall back to the link so they still get it.
+  const byEmail = automation.deliverByEmailOnly && ghlContactId !== null;
   try {
-    await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
-    details.push("link sent");
+    if (byEmail) {
+      const text = automation.emailSentText.trim() || DEFAULT_EMAIL_SENT_TEXT;
+      await client.sendMessage(event.igUserId, event.senderId, { text: renderTemplate(text, v).slice(0, 1000) });
+      details.push("confirmation sent; delivery by email");
+    } else {
+      if (automation.deliverByEmailOnly) details.push("CRM unavailable, sent link instead");
+      await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
+      details.push("link sent");
+    }
     await save({ state: "done", email, ghlContactId });
     return finish({ ...base, automationId: automation.id, status: "captured", detail: details.join("; ") });
   } catch (err) {

@@ -47,6 +47,8 @@ type AutomationRow = {
   email_prompt: string;
   email_retry_text: string;
   ghl_tags: string[];
+  deliver_by_email_only: boolean;
+  email_sent_text: string;
   intent_description: string;
   ai_faq: string;
   require_opt_in: boolean;
@@ -110,6 +112,8 @@ function rowToAutomation(r: AutomationRow): Automation {
     emailPrompt: r.email_prompt ?? "",
     emailRetryText: r.email_retry_text ?? "",
     ghlTags: r.ghl_tags ?? [],
+    deliverByEmailOnly: r.deliver_by_email_only ?? false,
+    emailSentText: r.email_sent_text ?? "",
     intentDescription: r.intent_description ?? "",
     aiFaq: r.ai_faq ?? "",
     requireOptIn: r.require_opt_in ?? true,
@@ -155,6 +159,8 @@ export class SupabaseStore implements Store {
       email_prompt: a.emailPrompt,
       email_retry_text: a.emailRetryText,
       ghl_tags: a.ghlTags,
+      deliver_by_email_only: a.deliverByEmailOnly,
+      email_sent_text: a.emailSentText,
       intent_description: a.intentDescription,
       ai_faq: a.aiFaq,
       require_opt_in: a.requireOptIn,
@@ -373,6 +379,8 @@ export function automationsFromEnv(json: string): Automation[] {
     emailPrompt: a.emailPrompt ?? "",
     emailRetryText: a.emailRetryText ?? "",
     ghlTags: a.ghlTags ?? [],
+    deliverByEmailOnly: a.deliverByEmailOnly ?? false,
+    emailSentText: a.emailSentText ?? "",
     intentDescription: a.intentDescription ?? "",
     aiFaq: a.aiFaq ?? "",
     requireOptIn: a.requireOptIn ?? true,

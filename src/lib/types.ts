@@ -52,6 +52,14 @@ export interface Automation {
   /** Tags added to the GoHighLevel contact. */
   ghlTags: string[];
   /**
+   * When true, the link is NOT sent in the DM after the email is captured. GoHighLevel delivers
+   * the resource by email (a workflow on one of the tags), and the DM only confirms it was sent.
+   * Falls back to sending the link if the CRM sync fails, so nobody is left with nothing.
+   */
+  deliverByEmailOnly: boolean;
+  /** Confirmation DM used when deliverByEmailOnly is on. Supports {{username}} and {{offer}}. */
+  emailSentText: string;
+  /**
    * Plain-English description of what a commenter is asking for when this rule should fire,
    * e.g. "someone asking for the gut health guide". Empty = keyword matching only.
    */

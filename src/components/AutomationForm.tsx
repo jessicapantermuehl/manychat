@@ -152,10 +152,24 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
           </label>
           <label>
             GoHighLevel tags
-            <input type="text" name="ghlTags" defaultValue={automation?.ghlTags.join(", ") ?? "instagram, convertlysocial"} placeholder="instagram, gut-guide" />
-            <span className="help">Comma-separated. Use a tag to trigger a GHL workflow.</span>
+            <input type="text" name="ghlTags" defaultValue={automation?.ghlTags.join(", ") ?? ""} placeholder="opt-in: healthy home guide, source: instagram" />
+            <span className="help">Comma-separated. A GHL workflow triggered by one of these tags can send the resource by email.</span>
           </label>
         </div>
+        <label className="check">
+          <input type="checkbox" name="deliverByEmailOnly" defaultChecked={automation?.deliverByEmailOnly ?? false} />
+          Deliver by email only (no link in the DM)
+        </label>
+        <span className="help">
+          Your GHL workflow sends the resource; the DM just confirms it. Fake addresses get nothing, and nobody has to open a link in Instagram's browser. If the GHL sync fails, the link is sent as a fallback.
+        </span>
+        <label>
+          Confirmation message
+          <textarea
+            name="emailSentText"
+            defaultValue={automation?.emailSentText || "Done! Your {{offer}} is on its way to your inbox, {{username}}. Give it a couple of minutes, and check spam or promotions if it's not there 💌"}
+          />
+        </label>
       </fieldset>
 
       <fieldset className="group">

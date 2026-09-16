@@ -81,10 +81,10 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
         <textarea
           name="dmText"
           required
-          defaultValue={automation?.dmText ?? "Here's your {{offer}}, {{username}}! {{link}}"}
+          defaultValue={automation?.dmText ?? "Sure thing, {{username}}! Here's your {{offer}}:"}
         />
         <span className="help">
-          Placeholders: <code>{"{{username}}"}</code>, <code>{"{{link}}"}</code> and <code>{"{{offer}}"}</code>. If you leave out <code>{"{{link}}"}</code>, the link is added on its own line at the end.
+          Placeholders: <code>{"{{username}}"}</code> and <code>{"{{offer}}"}</code>. The link is added on its own line at the end, or write <code>{"{{link}}"}</code> to place it inline.
         </span>
       </label>
 

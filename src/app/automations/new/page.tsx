@@ -21,7 +21,7 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
         keywords: (params.keywords ?? "").split(",").map((k) => k.trim()).filter(Boolean),
         matchMode: "contains",
         publicReplies: params.publicReplies ? params.publicReplies.split("\n") : ["Sent it to your DMs! 💌", "Check your inbox 📩", "Just sent you the link! ✨"],
-        dmText: params.dmText ?? "Hey {{username}}! Here's the link you asked for: {{link}}",
+        dmText: params.dmText ?? "Sure thing, {{username}}! Here's your {{offer}}:",
         dmLink: params.dmLink ?? null,
         dmButtonTitle: null,
         ignoreReplies: true,

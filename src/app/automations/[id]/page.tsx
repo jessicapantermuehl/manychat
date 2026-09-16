@@ -5,8 +5,15 @@ import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditAutomationPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditAutomationPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
   const store = getStore();
   const [automation, accounts] = await Promise.all([store.getAutomation(id), store.listAccounts()]);
   if (!automation) notFound();
@@ -17,6 +24,7 @@ export default async function EditAutomationPage({ params }: { params: Promise<{
         <h1>Edit automation</h1>
         <a className="btn secondary" href="/">Cancel</a>
       </header>
+      {query.error && <div className="notice bad">Could not save: {query.error}</div>}
       <section className="card">
         <AutomationForm automation={automation} accounts={accounts} envIgUserId={env.igUserId} />
       </section>

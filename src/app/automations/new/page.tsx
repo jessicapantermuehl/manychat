@@ -47,6 +47,7 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
           <a className="btn secondary" href="/">Back</a>
         </div>
       </header>
+      {params.error && <div className="notice bad">Could not save: {params.error}</div>}
       <section className="card">
         <AutomationForm accounts={accounts} envIgUserId={env.igUserId} automation={preset} />
       </section>

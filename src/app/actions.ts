@@ -49,59 +49,108 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
   };
 }
 
+/**
+ * Server actions never throw to the browser: in production Next.js would replace the page with a
+ * blank "client-side exception" screen. Instead every action redirects back with ?error=<message>.
+ */
+function describe(err: unknown): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const e = err as { message: string; code?: string; details?: string; hint?: string };
+    return [e.message, e.details, e.hint].filter(Boolean).join(" ");
+  }
+  return String(err);
+}
+
+function withError(path: string, message: string): string {
+  const url = new URL(path, "http://x");
+  url.searchParams.set("error", message.slice(0, 300));
+  return `${url.pathname}${url.search}`;
+}
+
 export async function saveAutomation(form: FormData) {
   const id = String(form.get("id") ?? "").trim() || undefined;
-  const data = parseForm(form);
-  if (!data.igUserId) throw new Error("Choose an Instagram account first.");
-  if (!data.dmText) throw new Error("The DM text is required.");
-  if (data.collectEmail && !data.emailPrompt) throw new Error("Write the message that asks for the email.");
-  await getStore().upsertAutomation({ ...data, id });
-  revalidatePath("/");
+  const back = id ? `/automations/${id}` : "/automations/new";
+  let failure: string | null = null;
+  try {
+    const data = parseForm(form);
+    if (!data.igUserId) throw new Error("Choose an Instagram account first.");
+    if (!data.dmText) throw new Error("The DM text is required.");
+    if (data.collectEmail && !data.emailPrompt) throw new Error("Write the message that asks for the email.");
+    await getStore().upsertAutomation({ ...data, id });
+    revalidatePath("/");
+  } catch (err) {
+    failure = describe(err);
+  }
+  if (failure) redirect(withError(back, failure));
   redirect("/?saved=1");
 }
 
 export async function toggleAutomation(form: FormData) {
   const id = String(form.get("id") ?? "");
-  const store = getStore();
-  const existing = await store.getAutomation(id);
-  if (!existing) return;
-  await store.upsertAutomation({ ...existing, active: !existing.active });
-  revalidatePath("/");
+  let failure: string | null = null;
+  try {
+    const store = getStore();
+    const existing = await store.getAutomation(id);
+    if (existing) await store.upsertAutomation({ ...existing, active: !existing.active });
+    revalidatePath("/");
+  } catch (err) {
+    failure = describe(err);
+  }
+  if (failure) redirect(withError("/", failure));
 }
 
 export async function deleteAutomation(form: FormData) {
   const id = String(form.get("id") ?? "");
-  await getStore().deleteAutomation(id);
-  revalidatePath("/");
+  let failure: string | null = null;
+  try {
+    await getStore().deleteAutomation(id);
+    revalidatePath("/");
+  } catch (err) {
+    failure = describe(err);
+  }
+  if (failure) redirect(withError("/", failure));
   redirect("/?deleted=1");
 }
 
 export async function saveSettings(form: FormData) {
   const igUserId = String(form.get("igUserId") ?? "").trim();
-  if (!igUserId) throw new Error("Choose an account.");
-  await getStore().upsertSettings({
-    igUserId,
-    voiceSamples: String(form.get("voiceSamples") ?? "").trim(),
-    brandNotes: String(form.get("brandNotes") ?? "").trim(),
-  });
-  revalidatePath("/settings");
+  let failure: string | null = null;
+  try {
+    if (!igUserId) throw new Error("Choose an account.");
+    await getStore().upsertSettings({
+      igUserId,
+      voiceSamples: String(form.get("voiceSamples") ?? "").trim(),
+      brandNotes: String(form.get("brandNotes") ?? "").trim(),
+    });
+    revalidatePath("/settings");
+  } catch (err) {
+    failure = describe(err);
+  }
+  if (failure) redirect(withError("/settings", failure));
   redirect("/settings?saved=1");
 }
 
 /** Drafts the copy for a new automation with Claude, then opens the form pre-filled. */
 export async function generateAutomationCopy(form: FormData) {
-  const ai = getAi();
-  if (!ai) throw new Error("Set ANTHROPIC_API_KEY to enable AI copy generation.");
   const igUserId = String(form.get("igUserId") ?? "").trim();
   const offer = String(form.get("offer") ?? "").trim();
   const offerName = String(form.get("offerName") ?? "").trim();
   const keyword = String(form.get("keyword") ?? "").trim();
   const link = String(form.get("dmLink") ?? "").trim();
   const mediaId = String(form.get("mediaId") ?? "").trim();
-  if (!offer) throw new Error("Describe what you are giving away.");
 
-  const voice = igUserId ? await getStore().getSettings(igUserId) : null;
-  const copy = await ai.generateCopy({ offer: offerName ? `${offerName}: ${offer}` : offer, keyword, link, voice });
+  let copy: Awaited<ReturnType<NonNullable<ReturnType<typeof getAi>>["generateCopy"]>> | null = null;
+  let failure: string | null = null;
+  try {
+    const ai = getAi();
+    if (!ai) throw new Error("Set ANTHROPIC_API_KEY to enable AI copy generation.");
+    if (!offer) throw new Error("Describe what you are giving away.");
+    const voice = igUserId ? await getStore().getSettings(igUserId) : null;
+    copy = await ai.generateCopy({ offer: offerName ? `${offerName}: ${offer}` : offer, keyword, link, voice });
+  } catch (err) {
+    failure = describe(err);
+  }
+  if (failure || !copy) redirect(withError("/automations/generate", failure ?? "No copy was generated."));
 
   const params = new URLSearchParams({
     igUserId,

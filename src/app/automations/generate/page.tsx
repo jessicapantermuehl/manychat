@@ -18,6 +18,7 @@ export default async function GeneratePage({ searchParams }: { searchParams: Pro
         <div><h1>Draft with AI</h1><div className="sub">Describe the giveaway; Claude writes the replies, DM and email prompt in your voice.</div></div>
         <a className="btn secondary" href="/automations/new">Back</a>
       </header>
+      {params.error && <div className="notice bad">Could not save: {params.error}</div>}
       {!hasAi() && <div className="notice bad">Set ANTHROPIC_API_KEY in Vercel to use this.</div>}
       {!settings?.voiceSamples && (
         <div className="notice bad">

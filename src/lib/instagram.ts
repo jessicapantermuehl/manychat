@@ -30,8 +30,14 @@ export class InstagramApiError extends Error {
   }
 }
 
+export interface QuickReply {
+  content_type: "text";
+  title: string;
+  payload: string;
+}
+
 export type OutgoingMessage =
-  | { text: string }
+  | { text: string; quick_replies?: QuickReply[] }
   | {
       attachment: {
         type: "template";
@@ -42,6 +48,14 @@ export type OutgoingMessage =
         };
       };
     };
+
+/** A text message with tappable quick-reply chips (Instagram allows up to 13, titles up to 20 chars). */
+export function buildQuickReplyMessage(text: string, replies: Array<{ title: string; payload: string }>): OutgoingMessage {
+  return {
+    text: text.slice(0, 1000),
+    quick_replies: replies.slice(0, 13).map((r) => ({ content_type: "text", title: r.title.slice(0, 20), payload: r.payload.slice(0, 1000) })),
+  };
+}
 
 export function buildDmMessage(text: string, link: string | null, buttonTitle: string | null): OutgoingMessage {
   if (link && buttonTitle) {

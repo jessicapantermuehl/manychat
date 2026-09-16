@@ -28,6 +28,7 @@ export interface GeneratedCopy {
   publicReplies: string[];
   dmText: string;
   emailPrompt: string;
+  optInPrompt: string;
 }
 
 export interface VoiceProfile {
@@ -67,6 +68,7 @@ const CopyResult = z.object({
   publicReplies: z.array(z.string()).min(3).max(5),
   dmText: z.string(),
   emailPrompt: z.string(),
+  optInPrompt: z.string(),
 });
 
 const GUARDRAILS = `Rules that always apply:
@@ -169,6 +171,7 @@ ${GUARDRAILS}`,
 1. publicReplies: 3 to 5 short public replies posted under the comment (each under 80 characters, varied, may use one emoji, must tell the person to check their DMs).
 2. dmText: the DM that delivers the resource. Use the placeholders {{username}} and {{link}} literally. Two or three sentences.
 3. emailPrompt: a DM that asks for their email so the resource can be sent, using {{username}}. One or two sentences, friendly, low pressure.
+4. optInPrompt: the very first DM, asking whether they want the resource, using {{username}}. One sentence; a "Yes, send it!" button will be shown under it, so do not describe the button.
 Match the creator's voice closely.${voiceBlock(input.voice)}
 
 ${GUARDRAILS}`,

@@ -48,6 +48,9 @@ type AutomationRow = {
   ghl_tags: string[];
   intent_description: string;
   ai_faq: string;
+  require_opt_in: boolean;
+  opt_in_prompt: string;
+  opt_in_button: string;
   created_at: string;
 };
 
@@ -61,6 +64,7 @@ type ConversationRow = {
   attempts: number;
   email: string | null;
   ghl_contact_id: string | null;
+  last_message_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -76,6 +80,7 @@ function rowToConversation(r: ConversationRow): Conversation {
     attempts: r.attempts,
     email: r.email,
     ghlContactId: r.ghl_contact_id,
+    lastMessageId: r.last_message_id,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -101,6 +106,9 @@ function rowToAutomation(r: AutomationRow): Automation {
     ghlTags: r.ghl_tags ?? [],
     intentDescription: r.intent_description ?? "",
     aiFaq: r.ai_faq ?? "",
+    requireOptIn: r.require_opt_in ?? true,
+    optInPrompt: r.opt_in_prompt ?? "",
+    optInButton: r.opt_in_button ?? "",
     createdAt: r.created_at,
   };
 }
@@ -142,6 +150,9 @@ export class SupabaseStore implements Store {
       ghl_tags: a.ghlTags,
       intent_description: a.intentDescription,
       ai_faq: a.aiFaq,
+      require_opt_in: a.requireOptIn,
+      opt_in_prompt: a.optInPrompt,
+      opt_in_button: a.optInButton,
     };
     const { data, error } = await this.db.from("cs_automations").upsert(row).select("*").single();
     if (error) throw error;
@@ -231,6 +242,7 @@ export class SupabaseStore implements Store {
       attempts: c.attempts,
       email: c.email,
       ghl_contact_id: c.ghlContactId,
+      last_message_id: c.lastMessageId ?? null,
       updated_at: new Date().toISOString(),
     });
     if (error) throw error;
@@ -353,6 +365,9 @@ export function automationsFromEnv(json: string): Automation[] {
     ghlTags: a.ghlTags ?? [],
     intentDescription: a.intentDescription ?? "",
     aiFaq: a.aiFaq ?? "",
+    requireOptIn: a.requireOptIn ?? true,
+    optInPrompt: a.optInPrompt ?? "",
+    optInButton: a.optInButton ?? "",
   }));
 }
 

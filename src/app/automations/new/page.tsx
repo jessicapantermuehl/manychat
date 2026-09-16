@@ -31,6 +31,9 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
         ghlTags: [],
         intentDescription: params.intentDescription ?? "",
         aiFaq: "",
+        requireOptIn: true,
+        optInPrompt: params.optInPrompt ?? "",
+        optInButton: "",
       }
     : undefined;
 

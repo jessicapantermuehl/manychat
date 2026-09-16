@@ -1,11 +1,11 @@
 import { getAi, type Ai } from "./ai";
 import { env, hasGhl } from "./env";
 import { GhlApiError, GhlClient } from "./ghl";
-import { buildDmMessage, InstagramApiError, InstagramClient } from "./instagram";
+import { buildDmMessage, buildQuickReplyMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
 import { eligibleAutomations, findAutomation, pickPreferred, pickRandom, renderTemplate } from "./matching";
 import type { Store } from "./store";
 import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent } from "./types";
-import { extractEmail } from "./webhook";
+import { extractEmail, looksLikeNo, looksLikeYes } from "./webhook";
 
 export interface RunnerDeps {
   store: Store;
@@ -36,13 +36,41 @@ export function defaultAi(): Ai | null {
 }
 
 const PRIVATE_REPLY_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-/** Stop waiting for an email after this long. */
+/** Stop waiting for a reply after this long. */
 const CONVERSATION_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-/** Prompt + this many retries before we give up. */
+/** Prompt + this many retries before we give up asking for an email. */
 const MAX_EMAIL_ATTEMPTS = 2;
+/** How many times we ask "want it?" before going quiet. */
+const MAX_OPTIN_ATTEMPTS = 2;
+
+export const OPT_IN_YES = "CS_OPTIN_YES";
+export const OPT_IN_NO = "CS_OPTIN_NO";
+const DEFAULT_OPT_IN_PROMPT = "Hey {{username}}! Want me to send you the link?";
+const DEFAULT_OPT_IN_BUTTON = "Yes, send it!";
+
+function vars(username: string, automation: Automation) {
+  return { username, link: automation.dmLink ?? "" };
+}
+
+function optInMessage(automation: Automation, username: string): OutgoingMessage {
+  const prompt = renderTemplate(automation.optInPrompt.trim() || DEFAULT_OPT_IN_PROMPT, vars(username, automation));
+  const yes = automation.optInButton.trim() || DEFAULT_OPT_IN_BUTTON;
+  return buildQuickReplyMessage(prompt, [
+    { title: yes, payload: OPT_IN_YES },
+    { title: "No thanks", payload: OPT_IN_NO },
+  ]);
+}
+
+function linkMessage(automation: Automation, username: string): OutgoingMessage {
+  return buildDmMessage(renderTemplate(automation.dmText, vars(username, automation)), automation.dmLink, automation.dmButtonTitle);
+}
+
+function emailPromptMessage(automation: Automation, username: string): OutgoingMessage {
+  return { text: renderTemplate(automation.emailPrompt, vars(username, automation)).slice(0, 1000) };
+}
 
 /**
- * Processes one comment: match a rule, reply publicly, send the DM, record the outcome.
+ * Processes one comment: match a rule, reply publicly, send the first DM, record the outcome.
  * Never throws; every path records an activity row so the dashboard shows what happened.
  */
 export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps): Promise<ActivityRecord> {
@@ -123,13 +151,11 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
     return finish(await withTriage({ ...base, automationId: automation.id, status: "failed", detail: "no access token for this account" }));
   }
 
-  const vars = { username: event.fromUsername, link: automation.dmLink ?? "" };
-
   // 5. Public reply under the comment (optional).
   const publicReply = pickRandom(automation.publicReplies.filter((r) => r.trim()), deps.random);
   if (publicReply) {
     try {
-      await client.replyToComment(event.commentId, renderTemplate(publicReply, vars));
+      await client.replyToComment(event.commentId, renderTemplate(publicReply, vars(event.fromUsername, automation)));
       details.push("public reply posted");
     } catch (err) {
       details.push(`public reply failed: ${describeError(err)}`);
@@ -137,28 +163,39 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
     }
   }
 
-  // 6. The DM (private reply). Either the link straight away, or the email question first.
+  // 6. The one private reply Meta allows per comment. Three shapes, in order of preference:
+  //    opt-in question with buttons (recommended) → email question → the link itself.
   try {
-    if (automation.collectEmail && automation.emailPrompt.trim()) {
-      const res = await client.sendPrivateReply(event.igUserId, event.commentId, { text: renderTemplate(automation.emailPrompt, vars).slice(0, 1000) });
-      const igsid = res?.recipient_id || event.fromId;
-      await store.upsertConversation({
-        igUserId: event.igUserId,
-        igsid,
-        username: event.fromUsername,
-        automationId: automation.id,
-        commentId: event.commentId,
-        state: "awaiting_email",
-        attempts: 1,
-        email: null,
-        ghlContactId: null,
-      });
+    let message: OutgoingMessage;
+    let nextState: Conversation["state"];
+    if (automation.requireOptIn) {
+      message = optInMessage(automation, event.fromUsername);
+      nextState = "awaiting_optin";
+      details.push("asked for opt-in");
+    } else if (automation.collectEmail && automation.emailPrompt.trim()) {
+      message = emailPromptMessage(automation, event.fromUsername);
+      nextState = "awaiting_email";
       details.push("asked for email");
     } else {
-      const message = buildDmMessage(renderTemplate(automation.dmText, vars), automation.dmLink, automation.dmButtonTitle);
-      await client.sendPrivateReply(event.igUserId, event.commentId, message);
+      message = linkMessage(automation, event.fromUsername);
+      nextState = "done";
       details.push("DM sent");
     }
+
+    const res = await client.sendPrivateReply(event.igUserId, event.commentId, message);
+    const igsid = res?.recipient_id || event.fromId;
+    await store.upsertConversation({
+      igUserId: event.igUserId,
+      igsid,
+      username: event.fromUsername,
+      automationId: automation.id,
+      commentId: event.commentId,
+      state: nextState,
+      attempts: 1,
+      email: null,
+      ghlContactId: null,
+      lastMessageId: null,
+    });
     return finish(await withTriage({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") }));
   } catch (err) {
     details.push(`DM failed: ${describeError(err)}`);
@@ -168,21 +205,24 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
 }
 
 /**
- * Processes one inbound DM. Only conversations we started (awaiting an email) are acted on;
- * every other message is ignored so the app never talks to people who did not opt in.
+ * Processes one inbound DM or button tap. Only conversations we started are acted on; every other
+ * message is ignored so the app never talks to people who did not comment first.
  */
 export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps): Promise<ActivityRecord | null> {
   const { store } = deps;
   const log = deps.log ?? (() => {});
 
   const conversation = await store.getConversation(event.igUserId, event.senderId);
-  if (!conversation || conversation.state !== "awaiting_email") return null;
+  if (!conversation) return null;
+  if (conversation.state === "done" || conversation.state === "abandoned") return null;
+  // Meta can redeliver a webhook; never act on the same message twice.
+  if (conversation.lastMessageId && conversation.lastMessageId === event.messageId) return null;
 
   const base = {
     commentId: conversation.commentId,
     igUserId: event.igUserId,
     fromUsername: conversation.username,
-    commentText: event.text,
+    commentText: event.text || (event.payload ? `[tap: ${event.payload}]` : ""),
   };
   const finish = async (record: ActivityRecord) => {
     try {
@@ -192,13 +232,19 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
     }
     return record;
   };
-  const save = (patch: Partial<Conversation>) => store.upsertConversation({ ...conversation, ...patch });
+  const save = (patch: Partial<Conversation>) => store.upsertConversation({ ...conversation, ...patch, lastMessageId: event.messageId });
 
   // Too old: stop listening so a message weeks later does not trigger anything.
   const startedAt = conversation.createdAt ? Date.parse(conversation.createdAt) : Date.now();
   if (Date.now() - startedAt > CONVERSATION_TTL_MS) {
     await save({ state: "abandoned" });
-    return finish({ ...base, automationId: conversation.automationId, status: "skipped", detail: "email conversation expired" });
+    return finish({ ...base, automationId: conversation.automationId, status: "skipped", detail: "conversation expired" });
+  }
+
+  // An explicit no or a stop word ends the conversation immediately, in any state.
+  if (event.payload === OPT_IN_NO || (!event.payload && looksLikeNo(event.text))) {
+    await save({ state: "abandoned" });
+    return finish({ ...base, automationId: conversation.automationId, status: "skipped", detail: "declined; conversation closed" });
   }
 
   const automation = await store.getAutomation(conversation.automationId);
@@ -208,7 +254,74 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
     return finish({ ...base, automationId: conversation.automationId, status: "failed", detail: automation ? "no access token for this account" : "automation no longer exists" });
   }
 
-  const vars = { username: conversation.username, link: automation.dmLink ?? "" };
+  if (conversation.state === "awaiting_optin") {
+    return handleOptInReply(event, conversation, automation, client, deps, base, finish, save);
+  }
+  return handleEmailReply(event, conversation, automation, client, deps, base, finish, save);
+}
+
+type Finish = (r: ActivityRecord) => Promise<ActivityRecord>;
+type Save = (patch: Partial<Conversation>) => Promise<void>;
+type Base = Omit<ActivityRecord, "automationId" | "status" | "detail">;
+
+async function handleOptInReply(
+  event: MessageEvent,
+  conversation: Conversation,
+  automation: Automation,
+  client: InstagramClient,
+  deps: RunnerDeps,
+  base: Base,
+  finish: Finish,
+  save: Save,
+): Promise<ActivityRecord> {
+  const log = deps.log ?? (() => {});
+  const saidYes = event.payload === OPT_IN_YES || (!event.payload && looksLikeYes(event.text));
+
+  if (!saidYes) {
+    // Anything else: ask once more with the buttons, then go quiet.
+    if (conversation.attempts >= MAX_OPTIN_ATTEMPTS) {
+      await save({ state: "abandoned" });
+      return finish({ ...base, automationId: automation.id, status: "skipped", detail: "no opt-in after reminder; conversation closed" });
+    }
+    try {
+      await client.sendMessage(event.igUserId, event.senderId, optInMessage(automation, conversation.username));
+      await save({ attempts: conversation.attempts + 1 });
+      return finish({ ...base, automationId: automation.id, status: "sent", detail: "asked for opt-in again" });
+    } catch (err) {
+      log("opt-in reminder failed", err);
+      return finish({ ...base, automationId: automation.id, status: "failed", detail: `opt-in reminder failed: ${describeError(err)}` });
+    }
+  }
+
+  // They said yes: the 24-hour window is open. Either ask for the email or deliver the link.
+  try {
+    if (automation.collectEmail && automation.emailPrompt.trim()) {
+      await client.sendMessage(event.igUserId, event.senderId, emailPromptMessage(automation, conversation.username));
+      await save({ state: "awaiting_email", attempts: 1 });
+      return finish({ ...base, automationId: automation.id, status: "sent", detail: "opted in; asked for email" });
+    }
+    await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
+    await save({ state: "done" });
+    return finish({ ...base, automationId: automation.id, status: "sent", detail: "opted in; link sent" });
+  } catch (err) {
+    log("post-opt-in DM failed", err);
+    return finish({ ...base, automationId: automation.id, status: "failed", detail: `DM after opt-in failed: ${describeError(err)}` });
+  }
+}
+
+async function handleEmailReply(
+  event: MessageEvent,
+  conversation: Conversation,
+  automation: Automation,
+  client: InstagramClient,
+  deps: RunnerDeps,
+  base: Base,
+  finish: Finish,
+  save: Save,
+): Promise<ActivityRecord> {
+  const { store } = deps;
+  const log = deps.log ?? (() => {});
+  const v = vars(conversation.username, automation);
   const email = extractEmail(event.text);
 
   // No email in the reply: answer their question from the FAQ if we can, ask again, then give up quietly.
@@ -231,7 +344,7 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
       }
     }
     try {
-      const text = answer ? `${answer}\n\n${renderTemplate(retry, vars)}` : renderTemplate(retry, vars);
+      const text = answer ? `${answer}\n\n${renderTemplate(retry, v)}` : renderTemplate(retry, v);
       await client.sendMessage(event.igUserId, event.senderId, { text: text.slice(0, 1000) });
       await save({ attempts: conversation.attempts + 1 });
       return finish({ ...base, automationId: automation.id, status: "sent", detail: answer ? "answered from FAQ and asked for email again" : "asked for email again" });
@@ -259,8 +372,7 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
   }
 
   try {
-    const message = buildDmMessage(renderTemplate(automation.dmText, vars), automation.dmLink, automation.dmButtonTitle);
-    await client.sendMessage(event.igUserId, event.senderId, message);
+    await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
     details.push("link sent");
     await save({ state: "done", email, ghlContactId });
     return finish({ ...base, automationId: automation.id, status: "captured", detail: details.join("; ") });

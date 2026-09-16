@@ -31,7 +31,8 @@ interface WebhookPayload {
       sender?: { id?: string };
       recipient?: { id?: string };
       timestamp?: number;
-      message?: { mid?: string; text?: string; is_echo?: boolean };
+      message?: { mid?: string; text?: string; is_echo?: boolean; quick_reply?: { payload?: string } };
+      postback?: { mid?: string; title?: string; payload?: string };
     }>;
     changes?: Array<{
       field?: string;
@@ -83,15 +84,28 @@ export function parseMessageEvents(payload: unknown): MessageEvent[] {
   for (const entry of body.entry) {
     if (!entry?.id || !Array.isArray(entry.messaging)) continue;
     for (const m of entry.messaging) {
-      if (!m?.sender?.id || !m.message?.mid) continue;
-      if (m.message.is_echo) continue;
+      if (!m?.sender?.id) continue;
       if (m.sender.id === String(entry.id)) continue;
+      const timestamp = typeof m.timestamp === "number" ? m.timestamp : Date.now();
+      if (m.postback?.payload) {
+        events.push({
+          igUserId: String(entry.id),
+          senderId: String(m.sender.id),
+          messageId: String(m.postback.mid ?? `postback-${m.sender.id}-${timestamp}`),
+          text: m.postback.title ?? "",
+          payload: String(m.postback.payload),
+          timestamp,
+        });
+        continue;
+      }
+      if (!m.message?.mid || m.message.is_echo) continue;
       events.push({
         igUserId: String(entry.id),
         senderId: String(m.sender.id),
         messageId: String(m.message.mid),
         text: m.message.text ?? "",
-        timestamp: typeof m.timestamp === "number" ? m.timestamp : Date.now(),
+        payload: m.message.quick_reply?.payload ? String(m.message.quick_reply.payload) : null,
+        timestamp,
       });
     }
   }
@@ -104,4 +118,17 @@ const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 export function extractEmail(text: string): string | null {
   const match = text.match(EMAIL_PATTERN);
   return match ? match[0].toLowerCase().replace(/[.,;:!?]+$/, "") : null;
+}
+
+/** "yes", "yes please!!", "sure", "send it", "ok" ... */
+const YES_PATTERN = /^[^\p{L}\p{N}]*(y+e+s+|yea+h*|yep|yup|sure|ok(ay)?|please|send( it| me)?|i want it|absolutely|definitely|👍|✅|🙌|💌|❤️|🙏)(?![\p{L}\p{N}])/iu;
+/** "no", "no thanks", "stop", "unsubscribe" ... */
+const NO_PATTERN = /^[^\p{L}\p{N}]*(no+( thanks| thank you| ty)?|nope|nah|stop|unsubscribe|cancel|leave me alone|not interested|don'?t)(?![\p{L}\p{N}])/iu;
+
+export function looksLikeYes(text: string): boolean {
+  return YES_PATTERN.test(text.trim());
+}
+
+export function looksLikeNo(text: string): boolean {
+  return NO_PATTERN.test(text.trim());
 }

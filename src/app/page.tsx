@@ -82,7 +82,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     <td><a href={`/automations/${a.id}`}><strong>{a.name}</strong></a></td>
                     <td>{a.keywords.length ? a.keywords.map((k) => <code key={k} style={{ marginRight: 4 }}>{k}</code>) : <span className="muted">any comment</span>}</td>
                     <td>{a.mediaId ? <code>{a.mediaId}</code> : <span className="muted">all posts</span>}</td>
-                    <td className="muted">{[a.collectEmail && "email", a.intentDescription && "intent", a.aiFaq && "FAQ", a.dmButtonTitle && "button"].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="muted">{[a.requireOptIn && "opt-in", a.collectEmail && "email", a.intentDescription && "intent", a.aiFaq && "FAQ", a.dmButtonTitle && "button"].filter(Boolean).join(" · ") || "—"}</td>
                     <td><span className={`pill ${a.active ? "on" : "off"}`}>{a.active ? "Active" : "Paused"}</span></td>
                     <td>
                       <div className="actions">

@@ -45,6 +45,9 @@ const rule: Automation = {
   ghlTags: ["instagram", "guide"],
   intentDescription: "",
   aiFaq: "",
+  requireOptIn: false,
+  optInPrompt: "",
+  optInButton: "",
 };
 
 const comment: CommentEvent = {
@@ -59,7 +62,7 @@ const comment: CommentEvent = {
   time: Math.floor(Date.now() / 1000),
 };
 
-const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, timestamp: Date.now() });
+const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, payload: null, timestamp: Date.now() });
 
 describe("email capture flow", () => {
   it("asks for the email first and remembers the conversation", async () => {

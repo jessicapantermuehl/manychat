@@ -32,6 +32,9 @@ const rule: Automation = {
   ghlTags: [],
   intentDescription: "",
   aiFaq: "",
+  requireOptIn: false,
+  optInPrompt: "",
+  optInButton: "",
 };
 
 const event: CommentEvent = {

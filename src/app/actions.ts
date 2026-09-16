@@ -42,6 +42,9 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
     ghlTags: commaList(form.get("ghlTags")),
     intentDescription: String(form.get("intentDescription") ?? "").trim(),
     aiFaq: String(form.get("aiFaq") ?? "").trim(),
+    requireOptIn: form.get("requireOptIn") === "on",
+    optInPrompt: String(form.get("optInPrompt") ?? "").trim(),
+    optInButton: String(form.get("optInButton") ?? "").trim().slice(0, 20),
   };
 }
 
@@ -106,6 +109,7 @@ export async function generateAutomationCopy(form: FormData) {
     publicReplies: copy.publicReplies.join("\n"),
     dmText: copy.dmText,
     emailPrompt: copy.emailPrompt,
+    optInPrompt: copy.optInPrompt,
     dmLink: link,
     intentDescription: `someone asking for ${offer.slice(0, 120)}`,
   });

@@ -13,16 +13,29 @@ Instagram API with Instagram Login.
 1. Meta sends a webhook to `/api/instagram/webhook` for every comment on your posts.
 2. The app checks the signature, finds the first active automation whose keywords match
    (post-specific rules beat account-wide ones) and skips your own comments and duplicates.
-3. It posts one of your public replies under the comment (optional) and sends the DM as an
-   Instagram **private reply**, which is allowed for 7 days after the comment, once per comment,
-   without the person having messaged you first.
-4. Every comment is logged on the dashboard as `sent`, `skipped`, `failed` or `captured` with the reason.
+3. It posts one of your public replies under the comment (optional) and sends **one** DM as an
+   Instagram **private reply**: the opt-in question with **Yes, send it!** / **No thanks** buttons.
+4. When they tap Yes (or type "yes"), Meta opens the 24-hour messaging window and the app sends
+   the link, or the email question if email capture is on. "No", "stop" or "unsubscribe" ends the
+   conversation at any point, and an unclear reply gets one reminder before the app goes quiet.
+5. Every comment and reply is logged on the dashboard as `sent`, `skipped`, `failed` or `captured`
+   with the reason.
+
+### Why the opt-in step matters
+
+Meta allows exactly one automatic message per comment (the private reply) and it does **not**
+open a conversation. Only an interaction from the person, a button tap or a reply, opens the
+24-hour window that permits anything else. Sending the link directly in the private reply works,
+but everything after it (the email step, an FAQ answer) would be impossible, and accounts that
+push unsolicited DMs at volume get flagged. The opt-in question is therefore on by default, the
+same way ManyChat's "Send me the link" button works. You can switch it off per automation for a
+simple link drop.
 
 ### Email capture → GoHighLevel
 
 Turn on **Ask for an email address before sending the link** in an automation and the flow becomes:
 
-1. Comment matches → public reply → DM asking for their email.
+1. Comment matches → public reply → opt-in question → they tap Yes → DM asking for their email.
 2. They reply with an email → the contact is upserted in GoHighLevel (first name = Instagram
    username, source = ConvertlySocial) and your tags are added → the DM with the link is sent.
 3. If the reply has no email, the app asks once more, then stops. Conversations expire after

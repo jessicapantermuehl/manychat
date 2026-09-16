@@ -30,7 +30,7 @@ function fakeAi(overrides: Partial<Ai> = {}): Ai & { calls: string[] } {
       calls.push(`faq:${question}`);
       return faq.includes("free") && /free/i.test(question) ? "Yes, it's completely free." : null;
     },
-    generateCopy: async () => ({ publicReplies: ["a", "b", "c"], dmText: "dm {{link}}", emailPrompt: "email {{username}}?" }),
+    generateCopy: async () => ({ publicReplies: ["a", "b", "c"], dmText: "dm {{link}}", emailPrompt: "email {{username}}?", optInPrompt: "want it {{username}}?" }),
     ...overrides,
   };
 }
@@ -54,6 +54,9 @@ const rule: Automation = {
   ghlTags: [],
   intentDescription: "someone asking for the gut health guide",
   aiFaq: "",
+  requireOptIn: false,
+  optInPrompt: "",
+  optInButton: "",
 };
 
 const comment = (text: string): CommentEvent => ({
@@ -68,7 +71,7 @@ const comment = (text: string): CommentEvent => ({
   time: Math.floor(Date.now() / 1000),
 });
 
-const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, timestamp: Date.now() });
+const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, payload: null, timestamp: Date.now() });
 
 describe("AI intent matching", () => {
   it("fires the automation when the comment expresses the intent without the keyword", async () => {

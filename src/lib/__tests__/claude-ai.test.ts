@@ -63,7 +63,7 @@ describe("ClaudeAi request shape", () => {
   });
 
   it("includes voice samples in the system prompt for copy generation", async () => {
-    const t = mockTransport(JSON.stringify({ publicReplies: ["a", "b", "c"], dmText: "d {{link}}", emailPrompt: "e {{username}}" }));
+    const t = mockTransport(JSON.stringify({ publicReplies: ["a", "b", "c"], dmText: "d {{link}}", emailPrompt: "e {{username}}", optInPrompt: "o {{username}}" }));
     const ai = new ClaudeAi({ apiKey: "test", fetch: t.fetchImpl });
     const copy = await ai.generateCopy({ offer: "gut guide", keyword: "GUIDE", link: "https://x.y", voice: { voiceSamples: "hey friend, real talk", brandNotes: "no hype" } });
     expect(copy.publicReplies).toHaveLength(3);

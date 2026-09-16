@@ -28,6 +28,17 @@ export interface Automation {
   /** Ignore comments that are replies to other comments. */
   ignoreReplies: boolean;
   /**
+   * When true (recommended), the private reply only asks whether they want the resource, with
+   * Yes / No buttons. The link (or the email question) is sent after they tap Yes. This keeps
+   * the account inside Meta's messaging rules: a private reply is one message, and the 24-hour
+   * window that allows further messages opens only after the person interacts.
+   */
+  requireOptIn: boolean;
+  /** The opt-in question. Supports {{username}}. */
+  optInPrompt: string;
+  /** Title of the Yes button, at most 20 characters. */
+  optInButton: string;
+  /**
    * When true the first DM asks for an email address instead of sending the link.
    * Once the person replies with an email, it is pushed to GoHighLevel and dmText (with the link) is sent.
    */
@@ -74,11 +85,13 @@ export interface MessageEvent {
   senderId: string;
   messageId: string;
   text: string;
+  /** Payload of a tapped quick reply or postback button, when the message was a tap. */
+  payload: string | null;
   /** Unix timestamp in milliseconds from the webhook. */
   timestamp: number;
 }
 
-export type ConversationState = "awaiting_email" | "done" | "abandoned";
+export type ConversationState = "awaiting_optin" | "awaiting_email" | "done" | "abandoned";
 
 /** Tracks an email-capture conversation with one person. */
 export interface Conversation {
@@ -93,6 +106,8 @@ export interface Conversation {
   attempts: number;
   email: string | null;
   ghlContactId: string | null;
+  /** Last inbound message id we acted on, so a redelivered webhook is ignored. */
+  lastMessageId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

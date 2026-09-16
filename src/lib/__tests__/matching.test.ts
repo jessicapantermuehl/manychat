@@ -53,6 +53,9 @@ function automation(overrides: Partial<Automation>): Automation {
     ghlTags: [],
     intentDescription: "",
     aiFaq: "",
+    requireOptIn: false,
+    optInPrompt: "",
+    optInButton: "",
     ...overrides,
   };
 }

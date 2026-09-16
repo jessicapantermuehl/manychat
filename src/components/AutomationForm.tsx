@@ -91,6 +91,31 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </div>
 
       <fieldset className="group">
+        <legend>Opt-in (recommended)</legend>
+        <label className="check">
+          <input type="checkbox" name="requireOptIn" defaultChecked={automation?.requireOptIn ?? true} />
+          Ask “want it?” with Yes / No buttons before sending anything else
+        </label>
+        <span className="help">
+          Meta allows exactly one automatic reply per comment. When they tap Yes, a 24-hour window opens for the link or the email question. This is the same consent step ManyChat uses, and it is what keeps the account clear of spam flags.
+        </span>
+        <div className="row">
+          <label>
+            Opt-in question
+            <textarea
+              name="optInPrompt"
+              defaultValue={automation?.optInPrompt || "Hey {{username}}! Want me to send you the guide? Tap below and it's yours 💌"}
+            />
+          </label>
+          <label>
+            Yes button (max 20 characters)
+            <input type="text" name="optInButton" maxLength={20} defaultValue={automation?.optInButton || "Yes, send it!"} />
+            <span className="help">A “No thanks” button is always added. Replies like “stop” or “no” are honoured everywhere.</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="group">
         <legend>Email capture → GoHighLevel</legend>
         <label className="check">
           <input type="checkbox" name="collectEmail" defaultChecked={automation?.collectEmail ?? false} />

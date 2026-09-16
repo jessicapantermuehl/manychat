@@ -54,7 +54,7 @@ const tap = (payload: string, id = `tap-${payload}-${Math.random()}`): MessageEv
 const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}-${Math.random()}`, text, payload: null, timestamp: Date.now() });
 
 describe("opt-in flow", () => {
-  it("the private reply is only the opt-in question with Yes / No quick replies", async () => {
+  it("the private reply is only the opt-in question with a single Yes quick reply", async () => {
     const store = new MemoryStore([rule]);
     const ig = fakeInstagram();
     const result = await handleCommentEvent(comment, { store, clientFor: async () => ig.client });
@@ -65,10 +65,7 @@ describe("opt-in flow", () => {
     const msg = ig.calls[0].body.message;
     expect(ig.calls[0].body.recipient).toEqual({ comment_id: "c1" });
     expect(msg.text).toBe("Hey fan, want the guide?");
-    expect(msg.quick_replies).toEqual([
-      { content_type: "text", title: "Yes please!", payload: OPT_IN_YES },
-      { content_type: "text", title: "No thanks", payload: OPT_IN_NO },
-    ]);
+    expect(msg.quick_replies).toEqual([{ content_type: "text", title: "Yes please!", payload: OPT_IN_YES }]);
     expect((await store.getConversation("acct", "igsid-42"))?.state).toBe("awaiting_optin");
   });
 
@@ -95,7 +92,7 @@ describe("opt-in flow", () => {
     expect(result?.detail).toBe("opted in; link sent");
   });
 
-  it("No thanks, 'no' or 'stop' closes the conversation without sending anything", async () => {
+  it("a typed 'no' or 'stop' (or a legacy No tap) closes the conversation without sending anything", async () => {
     for (const reply of [tap(OPT_IN_NO), dm("no thanks"), dm("STOP")]) {
       const store = new MemoryStore([rule]);
       const ig = fakeInstagram();
@@ -118,7 +115,7 @@ describe("opt-in flow", () => {
 
     const first = await handleMessageEvent(dm("what is this?"), deps);
     expect(first?.detail).toBe("asked for opt-in again");
-    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(2);
+    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(1);
 
     const second = await handleMessageEvent(dm("hm"), deps);
     expect(second?.status).toBe("skipped");
@@ -207,16 +204,16 @@ describe("parseMessageEvents with taps", () => {
 });
 
 describe("changing their mind after No", () => {
-  it("re-sends the opt-in question once after an accidental No, then delivers on Yes", async () => {
+  it("re-sends the opt-in question once after a typed no, then delivers on Yes", async () => {
     const store = new MemoryStore([rule]);
     const ig = fakeInstagram();
     const deps = { store, clientFor: async () => ig.client };
     await handleCommentEvent(comment, deps);
-    await handleMessageEvent(tap(OPT_IN_NO), deps);
+    await handleMessageEvent(dm("no"), deps);
 
     const oops = await handleMessageEvent(dm("wait, I do want it!"), deps);
     expect(oops?.detail).toBe("changed their mind; asked for opt-in again");
-    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(2);
+    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(1);
     expect((await store.getConversation("acct", "igsid-42"))?.state).toBe("awaiting_optin");
 
     const yes = await handleMessageEvent(tap(OPT_IN_YES), deps);

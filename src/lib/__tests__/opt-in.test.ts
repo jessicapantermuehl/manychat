@@ -17,6 +17,7 @@ function fakeInstagram() {
 const rule: Automation = {
   id: "r1",
   name: "Gut guide",
+  offerName: "Gut Guide",
   igUserId: "acct",
   mediaId: null,
   keywords: ["guide"],
@@ -249,5 +250,24 @@ describe("changing their mind after No", () => {
     const before = ig.calls.length;
     expect(await handleMessageEvent(dm("love your reels btw"), deps2)).toBeNull();
     expect(ig.calls.length).toBe(before);
+  });
+});
+
+describe("{{offer}} personalisation", () => {
+  it("names the resource in the default opt-in question and in custom messages", async () => {
+    const store = new MemoryStore([{ ...rule, optInPrompt: "", dmText: "Your {{offer}} is here {{username}}: {{link}}" }]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    expect(ig.calls[0].body.message.text).toBe("Hey fan! Thanks so much for asking for the Gut Guide. Just to confirm, would you like me to send you the link?");
+    await handleMessageEvent(tap(OPT_IN_YES), deps);
+    expect(ig.calls.at(-1)!.body.message.text).toBe("Your Gut Guide is here fan: https://example.com/guide");
+  });
+
+  it("falls back to a generic question when no offer name is set", async () => {
+    const store = new MemoryStore([{ ...rule, offerName: "", optInPrompt: "" }]);
+    const ig = fakeInstagram();
+    await handleCommentEvent(comment, { store, clientFor: async () => ig.client });
+    expect(ig.calls[0].body.message.text).toBe("Hey fan! Just to confirm, would you like me to send you the link?");
   });
 });

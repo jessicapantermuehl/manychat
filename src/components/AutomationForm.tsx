@@ -18,10 +18,20 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
     <form action={saveAutomation} className="stack">
       {automation?.id && <input type="hidden" name="id" value={automation.id} />}
 
-      <label>
-        Name
-        <input type="text" name="name" defaultValue={automation?.name ?? ""} placeholder="Gut health guide – Reel 14 Sept" required />
-      </label>
+      <div className="row">
+        <label>
+          Name
+          <input type="text" name="name" defaultValue={automation?.name ?? ""} placeholder="Healthy Home Guide – Reel 14 Sept" required />
+          <span className="help">Only you see this.</span>
+        </label>
+        <label>
+          What they get
+          <input type="text" name="offerName" defaultValue={automation?.offerName ?? ""} placeholder="Healthy Home Guide" />
+          <span className="help">
+            Used by <code>{"{{offer}}"}</code> in every message, as in “Thanks for asking for the {"{{offer}}"}”.
+          </span>
+        </label>
+      </div>
 
       <div className="row">
         <label>
@@ -71,10 +81,10 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
         <textarea
           name="dmText"
           required
-          defaultValue={automation?.dmText ?? "Hey {{username}}! Here's the guide you asked for: {{link}}"}
+          defaultValue={automation?.dmText ?? "Here's your {{offer}}, {{username}}! {{link}}"}
         />
         <span className="help">
-          Use <code>{"{{username}}"}</code> and <code>{"{{link}}"}</code> as placeholders.
+          Placeholders: <code>{"{{username}}"}</code>, <code>{"{{link}}"}</code> and <code>{"{{offer}}"}</code>.
         </span>
       </label>
 
@@ -104,7 +114,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
             Opt-in question
             <textarea
               name="optInPrompt"
-              defaultValue={automation?.optInPrompt || "Hey {{username}}! Want me to send you the guide? Tap below and it's yours 💌"}
+              defaultValue={automation?.optInPrompt || "Hey {{username}}! Thanks so much for asking for the {{offer}}. Just to confirm, would you like me to send you the link?"}
             />
           </label>
           <label>

@@ -26,6 +26,7 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
   const mediaId = String(form.get("mediaId") ?? "").trim();
   return {
     name: String(form.get("name") ?? "").trim() || "Untitled automation",
+    offerName: String(form.get("offerName") ?? "").trim(),
     igUserId: String(form.get("igUserId") ?? "").trim(),
     mediaId: mediaId || null,
     keywords: commaList(form.get("keywords")),
@@ -93,18 +94,20 @@ export async function generateAutomationCopy(form: FormData) {
   if (!ai) throw new Error("Set ANTHROPIC_API_KEY to enable AI copy generation.");
   const igUserId = String(form.get("igUserId") ?? "").trim();
   const offer = String(form.get("offer") ?? "").trim();
+  const offerName = String(form.get("offerName") ?? "").trim();
   const keyword = String(form.get("keyword") ?? "").trim();
   const link = String(form.get("dmLink") ?? "").trim();
   const mediaId = String(form.get("mediaId") ?? "").trim();
   if (!offer) throw new Error("Describe what you are giving away.");
 
   const voice = igUserId ? await getStore().getSettings(igUserId) : null;
-  const copy = await ai.generateCopy({ offer, keyword, link, voice });
+  const copy = await ai.generateCopy({ offer: offerName ? `${offerName}: ${offer}` : offer, keyword, link, voice });
 
   const params = new URLSearchParams({
     igUserId,
     mediaId,
-    name: offer.slice(0, 60),
+    name: offerName || offer.slice(0, 60),
+    offerName,
     keywords: keyword,
     publicReplies: copy.publicReplies.join("\n"),
     dmText: copy.dmText,

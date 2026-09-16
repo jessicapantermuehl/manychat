@@ -37,6 +37,7 @@ function automation(overrides: Partial<Automation>): Automation {
   return {
     id: "a",
     name: "test",
+    offerName: "",
     igUserId: "acct",
     mediaId: null,
     keywords: ["guide"],

@@ -3,6 +3,8 @@ export interface Automation {
   id: string;
   /** Human-readable name shown in the dashboard. */
   name: string;
+  /** What the person gets, as it should read inside a message: "Healthy Home Guide". Used by {{offer}}. */
+  offerName: string;
   /** Instagram user id (the account that owns the media). */
   igUserId: string;
   /** Media (post/reel) id this rule applies to. Empty = every post on the account. */

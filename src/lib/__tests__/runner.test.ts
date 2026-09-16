@@ -16,6 +16,7 @@ function makeClient() {
 const rule: Automation = {
   id: "r1",
   name: "Guide",
+  offerName: "",
   igUserId: "acct",
   mediaId: null,
   keywords: ["guide"],

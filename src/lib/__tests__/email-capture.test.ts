@@ -29,6 +29,7 @@ function fakeGhl(opts: { fail?: boolean } = {}) {
 const rule: Automation = {
   id: "r1",
   name: "Guide",
+  offerName: "",
   igUserId: "acct",
   mediaId: null,
   keywords: ["guide"],

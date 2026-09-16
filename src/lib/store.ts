@@ -32,6 +32,7 @@ export interface Store {
 type AutomationRow = {
   id: string;
   name: string;
+  offer_name: string;
   ig_user_id: string;
   media_id: string | null;
   keywords: string[];
@@ -94,6 +95,7 @@ function rowToAutomation(r: AutomationRow): Automation {
   return {
     id: r.id,
     name: r.name,
+    offerName: r.offer_name ?? "",
     igUserId: r.ig_user_id,
     mediaId: r.media_id,
     keywords: r.keywords ?? [],
@@ -138,6 +140,7 @@ export class SupabaseStore implements Store {
     const row = {
       ...(a.id ? { id: a.id } : {}),
       name: a.name,
+      offer_name: a.offerName,
       ig_user_id: a.igUserId,
       media_id: a.mediaId,
       keywords: a.keywords,
@@ -355,6 +358,7 @@ export function automationsFromEnv(json: string): Automation[] {
   return parsed.map((a, i) => ({
     id: a.id ?? `env-${i}`,
     name: a.name ?? `Automation ${i + 1}`,
+    offerName: a.offerName ?? "",
     igUserId: a.igUserId ?? env.igUserId,
     mediaId: a.mediaId ?? null,
     keywords: a.keywords ?? [],

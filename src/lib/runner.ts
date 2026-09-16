@@ -45,15 +45,17 @@ const MAX_OPTIN_ATTEMPTS = 2;
 
 export const OPT_IN_YES = "CS_OPTIN_YES";
 export const OPT_IN_NO = "CS_OPTIN_NO";
-const DEFAULT_OPT_IN_PROMPT = "Hey {{username}}! Want me to send you the link?";
+const DEFAULT_OPT_IN_PROMPT = "Hey {{username}}! Thanks so much for asking for the {{offer}}. Just to confirm, would you like me to send you the link?";
+const DEFAULT_OPT_IN_PROMPT_NO_OFFER = "Hey {{username}}! Just to confirm, would you like me to send you the link?";
 const DEFAULT_OPT_IN_BUTTON = "Yes please!";
 
 function vars(username: string, automation: Automation) {
-  return { username, link: automation.dmLink ?? "" };
+  return { username, link: automation.dmLink ?? "", offer: automation.offerName.trim() };
 }
 
 function optInMessage(automation: Automation, username: string): OutgoingMessage {
-  const prompt = renderTemplate(automation.optInPrompt.trim() || DEFAULT_OPT_IN_PROMPT, vars(username, automation));
+  const fallback = automation.offerName.trim() ? DEFAULT_OPT_IN_PROMPT : DEFAULT_OPT_IN_PROMPT_NO_OFFER;
+  const prompt = renderTemplate(automation.optInPrompt.trim() || fallback, vars(username, automation));
   const yes = automation.optInButton.trim() || DEFAULT_OPT_IN_BUTTON;
   // One button only. They asked for this by commenting, so the DM is a confirmation, not a survey.
   // Not tapping is the "no"; typed "no" / "stop" replies are still honoured.

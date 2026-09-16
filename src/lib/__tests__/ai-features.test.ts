@@ -38,6 +38,7 @@ function fakeAi(overrides: Partial<Ai> = {}): Ai & { calls: string[] } {
 const rule: Automation = {
   id: "r1",
   name: "Gut guide",
+  offerName: "Gut Guide",
   igUserId: "acct",
   mediaId: null,
   keywords: ["guide"],

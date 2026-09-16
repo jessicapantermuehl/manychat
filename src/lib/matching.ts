@@ -72,11 +72,12 @@ export function pickPreferred(candidates: Automation[]): Automation | null {
   return candidates.find((a) => a.mediaId) ?? candidates[0];
 }
 
-/** Replaces {{username}} and {{link}} placeholders. */
-export function renderTemplate(template: string, vars: { username: string; link: string }): string {
+/** Replaces {{username}}, {{link}} and {{offer}} placeholders. */
+export function renderTemplate(template: string, vars: { username: string; link: string; offer?: string }): string {
   return template
     .replace(/\{\{\s*username\s*\}\}/gi, vars.username)
-    .replace(/\{\{\s*link\s*\}\}/gi, vars.link);
+    .replace(/\{\{\s*link\s*\}\}/gi, vars.link)
+    .replace(/\{\{\s*offer\s*\}\}/gi, vars.offer ?? "");
 }
 
 export function pickRandom<T>(items: T[], random: () => number = Math.random): T | undefined {

@@ -15,6 +15,7 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
     ? {
         id: "",
         name: params.name ?? "",
+        offerName: params.offerName ?? "",
         igUserId: params.igUserId ?? "",
         mediaId: params.mediaId ?? null,
         keywords: (params.keywords ?? "").split(",").map((k) => k.trim()).filter(Boolean),

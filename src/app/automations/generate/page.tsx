@@ -36,14 +36,21 @@ export default async function GeneratePage({ searchParams }: { searchParams: Pro
                 {accounts.length === 0 && env.igUserId && <option value={env.igUserId}>env token account</option>}
               </select>
             </label>
+          </div>
+          <div className="row">
+            <label>
+              Name of the resource
+              <input type="text" name="offerName" placeholder="Healthy Home Guide" />
+              <span className="help">Exactly as it should read in a message.</span>
+            </label>
             <label>
               Keyword
               <input type="text" name="keyword" placeholder="GUIDE" />
             </label>
           </div>
           <label>
-            What are you giving away, and to whom?
-            <textarea name="offer" required rows={4} placeholder="A free 7-day gut reset guide (PDF) for women dealing with bloating and low energy." />
+            What is it, and who is it for?
+            <textarea name="offer" required rows={4} placeholder="A free PDF for women who want to cut the toxins hiding in everyday household products, room by room." />
           </label>
           <div className="row">
             <label>

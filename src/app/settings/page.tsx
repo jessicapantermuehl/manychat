@@ -15,8 +15,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <header className="top">
-        <h1>Voice &amp; AI settings</h1>
-        <a className="btn secondary" href="/">Back</a>
+        <div><h1>Voice &amp; AI</h1><div className="sub">Paste how you write; every AI feature matches it.</div></div>
+        <a className="btn secondary" href="/">Cancel</a>
       </header>
       {params.saved && <div className="notice ok">Saved.</div>}
       {!hasAi() && <div className="notice bad">ANTHROPIC_API_KEY is not set, so the AI features are off. These settings are kept for when it is.</div>}

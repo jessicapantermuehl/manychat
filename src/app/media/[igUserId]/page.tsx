@@ -22,12 +22,12 @@ export default async function MediaPage({ params }: { params: Promise<{ igUserId
   return (
     <>
       <header className="top">
-        <h1>Recent posts</h1>
-        <a className="btn secondary" href="/">Back</a>
+        <div><h1>Pick a post</h1><div className="sub">Scope an automation to one post or Reel.</div></div>
+        <a className="btn secondary" href="/">Cancel</a>
       </header>
       <section className="card">
         {error && <div className="notice bad">{error}</div>}
-        {!error && items.length === 0 && <p className="muted">No posts found.</p>}
+        {!error && items.length === 0 && <div className="empty">No posts found.</div>}
         {items.length > 0 && (
           <table>
             <thead><tr><th>Date</th><th>Type</th><th>Caption</th><th>Media ID</th><th></th></tr></thead>
@@ -38,7 +38,7 @@ export default async function MediaPage({ params }: { params: Promise<{ igUserId
                   <td>{m.media_type}</td>
                   <td><a href={m.permalink} target="_blank" rel="noreferrer">{(m.caption ?? "").slice(0, 80) || "(no caption)"}</a></td>
                   <td><code>{m.id}</code></td>
-                  <td><a className="btn" href={`/automations/new?igUserId=${igUserId}&mediaId=${m.id}`}>Automate</a></td>
+                  <td><a className="btn sm" href={`/automations/new?igUserId=${igUserId}&mediaId=${m.id}`}>Automate</a></td>
                 </tr>
               ))}
             </tbody>

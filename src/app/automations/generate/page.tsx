@@ -15,7 +15,7 @@ export default async function GeneratePage({ searchParams }: { searchParams: Pro
   return (
     <>
       <header className="top">
-        <h1>Draft an automation with AI</h1>
+        <div><h1>Draft with AI</h1><div className="sub">Describe the giveaway; Claude writes the replies, DM and email prompt in your voice.</div></div>
         <a className="btn secondary" href="/automations/new">Back</a>
       </header>
       {!hasAi() && <div className="notice bad">Set ANTHROPIC_API_KEY in Vercel to use this.</div>}

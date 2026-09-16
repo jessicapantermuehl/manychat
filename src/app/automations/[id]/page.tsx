@@ -15,7 +15,7 @@ export default async function EditAutomationPage({ params }: { params: Promise<{
     <>
       <header className="top">
         <h1>Edit automation</h1>
-        <a className="btn secondary" href="/">Back</a>
+        <a className="btn secondary" href="/">Cancel</a>
       </header>
       <section className="card">
         <AutomationForm automation={automation} accounts={accounts} envIgUserId={env.igUserId} />

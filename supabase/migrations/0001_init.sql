@@ -2,7 +2,7 @@
 
 create extension if not exists "pgcrypto";
 
-create table if not exists ig_accounts (
+create table if not exists cs_ig_accounts (
   ig_user_id        text primary key,
   username          text not null,
   access_token      text not null,
@@ -11,10 +11,10 @@ create table if not exists ig_accounts (
   updated_at        timestamptz not null default now()
 );
 
-create table if not exists automations (
+create table if not exists cs_automations (
   id               uuid primary key default gen_random_uuid(),
   name             text not null,
-  ig_user_id       text not null references ig_accounts (ig_user_id) on delete cascade,
+  ig_user_id       text not null references cs_ig_accounts (ig_user_id) on delete cascade,
   media_id         text,
   keywords         text[] not null default '{}',
   match_mode       text not null default 'contains' check (match_mode in ('contains', 'exact')),
@@ -27,13 +27,13 @@ create table if not exists automations (
   created_at       timestamptz not null default now()
 );
 
-create index if not exists automations_account_idx on automations (ig_user_id, active);
+create index if not exists cs_automations_account_idx on cs_automations (ig_user_id, active);
 
-create table if not exists activity (
+create table if not exists cs_activity (
   id             uuid primary key default gen_random_uuid(),
   comment_id     text not null,
   ig_user_id     text not null,
-  automation_id  uuid references automations (id) on delete set null,
+  automation_id  uuid references cs_automations (id) on delete set null,
   from_username  text not null default '',
   comment_text   text not null default '',
   status         text not null check (status in ('sent', 'skipped', 'failed')),
@@ -41,10 +41,10 @@ create table if not exists activity (
   created_at     timestamptz not null default now()
 );
 
-create index if not exists activity_comment_idx on activity (comment_id);
-create index if not exists activity_created_idx on activity (created_at desc);
+create index if not exists cs_activity_comment_idx on cs_activity (comment_id);
+create index if not exists cs_activity_created_idx on cs_activity (created_at desc);
 
 -- The app talks to these tables with the service-role key, so lock them down for everyone else.
-alter table ig_accounts enable row level security;
-alter table automations enable row level security;
-alter table activity    enable row level security;
+alter table cs_ig_accounts enable row level security;
+alter table cs_automations enable row level security;
+alter table cs_activity    enable row level security;

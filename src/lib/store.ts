@@ -58,7 +58,7 @@ export class SupabaseStore implements Store {
   constructor(private readonly db: SupabaseClient) {}
 
   async listAutomations(igUserId?: string) {
-    let q = this.db.from("automations").select("*").order("created_at", { ascending: true });
+    let q = this.db.from("cs_automations").select("*").order("created_at", { ascending: true });
     if (igUserId) q = q.eq("ig_user_id", igUserId);
     const { data, error } = await q;
     if (error) throw error;
@@ -66,7 +66,7 @@ export class SupabaseStore implements Store {
   }
 
   async getAutomation(id: string) {
-    const { data, error } = await this.db.from("automations").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await this.db.from("cs_automations").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
     return data ? rowToAutomation(data as AutomationRow) : null;
   }
@@ -86,24 +86,24 @@ export class SupabaseStore implements Store {
       ignore_replies: a.ignoreReplies,
       active: a.active,
     };
-    const { data, error } = await this.db.from("automations").upsert(row).select("*").single();
+    const { data, error } = await this.db.from("cs_automations").upsert(row).select("*").single();
     if (error) throw error;
     return rowToAutomation(data as AutomationRow);
   }
 
   async deleteAutomation(id: string) {
-    const { error } = await this.db.from("automations").delete().eq("id", id);
+    const { error } = await this.db.from("cs_automations").delete().eq("id", id);
     if (error) throw error;
   }
 
   async hasHandled(commentId: string) {
-    const { data, error } = await this.db.from("activity").select("id").eq("comment_id", commentId).in("status", ["sent", "failed"]).limit(1);
+    const { data, error } = await this.db.from("cs_activity").select("id").eq("comment_id", commentId).in("status", ["sent", "failed"]).limit(1);
     if (error) throw error;
     return (data?.length ?? 0) > 0;
   }
 
   async recordActivity(r: ActivityRecord) {
-    const { error } = await this.db.from("activity").insert({
+    const { error } = await this.db.from("cs_activity").insert({
       comment_id: r.commentId,
       ig_user_id: r.igUserId,
       automation_id: r.automationId,
@@ -116,7 +116,7 @@ export class SupabaseStore implements Store {
   }
 
   async listActivity(limit = 50) {
-    const { data, error } = await this.db.from("activity").select("*").order("created_at", { ascending: false }).limit(limit);
+    const { data, error } = await this.db.from("cs_activity").select("*").order("created_at", { ascending: false }).limit(limit);
     if (error) throw error;
     return (data ?? []).map((r) => ({
       id: r.id,
@@ -132,19 +132,19 @@ export class SupabaseStore implements Store {
   }
 
   async getAccount(igUserId: string) {
-    const { data, error } = await this.db.from("ig_accounts").select("*").eq("ig_user_id", igUserId).maybeSingle();
+    const { data, error } = await this.db.from("cs_ig_accounts").select("*").eq("ig_user_id", igUserId).maybeSingle();
     if (error) throw error;
     return data ? { igUserId: data.ig_user_id, username: data.username, accessToken: data.access_token, tokenExpiresAt: data.token_expires_at } : null;
   }
 
   async listAccounts() {
-    const { data, error } = await this.db.from("ig_accounts").select("*");
+    const { data, error } = await this.db.from("cs_ig_accounts").select("*");
     if (error) throw error;
     return (data ?? []).map((d) => ({ igUserId: d.ig_user_id, username: d.username, accessToken: d.access_token, tokenExpiresAt: d.token_expires_at }));
   }
 
   async upsertAccount(a: IgAccount) {
-    const { error } = await this.db.from("ig_accounts").upsert({
+    const { error } = await this.db.from("cs_ig_accounts").upsert({
       ig_user_id: a.igUserId,
       username: a.username,
       access_token: a.accessToken,

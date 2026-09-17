@@ -119,6 +119,28 @@ export async function toggleAutomation(form: FormData) {
   if (failure) redirect(withError("/", failure));
 }
 
+/** Copies an automation. The copy starts paused and opens in the editor, so nothing fires twice by accident. */
+export async function duplicateAutomation(form: FormData) {
+  const id = String(form.get("id") ?? "");
+  let failure: string | null = null;
+  let copyId: string | null = null;
+  try {
+    const store = getStore();
+    const existing = await store.getAutomation(id);
+    if (!existing) throw new Error("That automation no longer exists.");
+    const { id: _id, createdAt: _createdAt, ...rest } = existing;
+    void _id;
+    void _createdAt;
+    const copy = await store.upsertAutomation({ ...rest, name: `${existing.name} (copy)`, active: false });
+    copyId = copy.id;
+    revalidatePath("/");
+  } catch (err) {
+    failure = describe(err);
+  }
+  if (failure || !copyId) redirect(withError("/", failure ?? "Could not duplicate."));
+  redirect(`/automations/${copyId}?copied=1`);
+}
+
 export async function deleteAutomation(form: FormData) {
   const id = String(form.get("id") ?? "");
   let failure: string | null = null;

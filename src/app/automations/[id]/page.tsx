@@ -25,6 +25,7 @@ export default async function EditAutomationPage({
         <a className="btn secondary" href="/">Cancel</a>
       </header>
       {query.error && <div className="notice bad">Could not save: {query.error}</div>}
+      {query.copied && <div className="notice ok">This is a copy, saved as paused. Change the name, keyword and link, tick Active, then save.</div>}
       <section className="card">
         <AutomationForm automation={automation} accounts={accounts} envIgUserId={env.igUserId} />
       </section>

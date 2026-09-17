@@ -1,4 +1,4 @@
-import { deleteAutomation, toggleAutomation } from "./actions";
+import { deleteAutomation, duplicateAutomation, toggleAutomation } from "./actions";
 import { env, hasAi, hasGhl, hasSupabase } from "@/lib/env";
 import { getStore } from "@/lib/store";
 
@@ -89,6 +89,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                         <form action={toggleAutomation}>
                           <input type="hidden" name="id" value={a.id} />
                           <button className="btn secondary sm" type="submit">{a.active ? "Pause" : "Resume"}</button>
+                        </form>
+                        <form action={duplicateAutomation}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <button className="btn secondary sm" type="submit">Duplicate</button>
                         </form>
                         <form action={deleteAutomation}>
                           <input type="hidden" name="id" value={a.id} />

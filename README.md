@@ -24,6 +24,13 @@ Instagram API with Instagram Login.
 5. Every comment and reply is logged on the dashboard as `sent`, `skipped`, `failed` or `captured`
    with the reason.
 
+### Analytics
+
+The **Analytics** page shows, for the last 7, 30 or 90 days: triggered → opted in → delivered →
+emails captured with conversion rates, a per-day chart, the same funnel per automation, the mix
+of comment types from AI triage, and how many comments matched nothing (a hint to add an intent
+description).
+
 ### Story replies, story mentions and keyword DMs
 
 Each automation chooses what starts it: post/Reel comments (default), replies to your stories,

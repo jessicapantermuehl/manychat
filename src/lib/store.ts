@@ -12,6 +12,8 @@ export interface Store {
   hasHandled(commentId: string): Promise<boolean>;
   recordActivity(record: ActivityRecord): Promise<void>;
   listActivity(limit?: number): Promise<ActivityRecord[]>;
+  /** All activity since an ISO timestamp, oldest first (capped). */
+  listActivitySince(sinceIso: string, limit?: number): Promise<ActivityRecord[]>;
 
   getAccount(igUserId: string): Promise<IgAccount | null>;
   listAccounts(): Promise<IgAccount[]>;
@@ -228,6 +230,24 @@ export class SupabaseStore implements Store {
     })) as ActivityRecord[];
   }
 
+  async listActivitySince(sinceIso: string, limit = 5000) {
+    const { data, error } = await this.db.from("cs_activity").select("*").gte("created_at", sinceIso).order("created_at", { ascending: true }).limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      commentId: r.comment_id,
+      igUserId: r.ig_user_id,
+      automationId: r.automation_id,
+      fromUsername: r.from_username,
+      commentText: r.comment_text,
+      status: r.status,
+      detail: r.detail,
+      category: r.category ?? null,
+      suggestedReply: r.suggested_reply ?? null,
+      createdAt: r.created_at,
+    })) as ActivityRecord[];
+  }
+
   async getAccount(igUserId: string) {
     const { data, error } = await this.db.from("cs_ig_accounts").select("*").eq("ig_user_id", igUserId).maybeSingle();
     if (error) throw error;
@@ -337,6 +357,9 @@ export class MemoryStore implements Store {
   }
   async listActivity(limit = 50) {
     return this.activity.slice(0, limit);
+  }
+  async listActivitySince(sinceIso: string, limit = 5000) {
+    return this.activity.filter((r) => (r.createdAt ?? "") >= sinceIso).slice(0, limit).reverse();
   }
   async getAccount(igUserId: string) {
     return this.accounts.get(igUserId) ?? null;

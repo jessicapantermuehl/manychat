@@ -8,6 +8,7 @@ export function Nav() {
         </a>
         <div className="nav-links">
           <a href="/">Dashboard</a>
+          <a href="/analytics">Analytics</a>
           <a href="/automations/new">New automation</a>
           <a href="/settings">Voice &amp; AI</a>
         </div>

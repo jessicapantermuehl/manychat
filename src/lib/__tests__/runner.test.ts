@@ -15,6 +15,7 @@ function makeClient() {
 
 const rule: Automation = {
   id: "r1",
+  triggers: ["comment"],
   name: "Guide",
   offerName: "",
   igUserId: "acct",
@@ -39,6 +40,8 @@ const rule: Automation = {
   requireOptIn: false,
   optInPrompt: "",
   optInButton: "",
+  requireFollow: false,
+  followPrompt: "",
 };
 
 const event: CommentEvent = {

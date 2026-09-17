@@ -36,6 +36,7 @@ describe("keywordMatches", () => {
 function automation(overrides: Partial<Automation>): Automation {
   return {
     id: "a",
+    triggers: ["comment"],
     name: "test",
     offerName: "",
     igUserId: "acct",
@@ -60,6 +61,8 @@ function automation(overrides: Partial<Automation>): Automation {
     requireOptIn: false,
     optInPrompt: "",
     optInButton: "",
+    requireFollow: false,
+    followPrompt: "",
     ...overrides,
   };
 }

@@ -31,7 +31,14 @@ interface WebhookPayload {
       sender?: { id?: string };
       recipient?: { id?: string };
       timestamp?: number;
-      message?: { mid?: string; text?: string; is_echo?: boolean; quick_reply?: { payload?: string } };
+      message?: {
+        mid?: string;
+        text?: string;
+        is_echo?: boolean;
+        quick_reply?: { payload?: string };
+        reply_to?: { story?: { id?: string; url?: string } };
+        attachments?: Array<{ type?: string; payload?: { url?: string } }>;
+      };
       postback?: { mid?: string; title?: string; payload?: string };
     }>;
     changes?: Array<{
@@ -94,17 +101,22 @@ export function parseMessageEvents(payload: unknown): MessageEvent[] {
           messageId: String(m.postback.mid ?? `postback-${m.sender.id}-${timestamp}`),
           text: m.postback.title ?? "",
           payload: String(m.postback.payload),
+          storyReplyId: null,
+          storyMention: false,
           timestamp,
         });
         continue;
       }
       if (!m.message?.mid || m.message.is_echo) continue;
+      const storyMention = (m.message.attachments ?? []).some((a) => a?.type === "story_mention");
       events.push({
         igUserId: String(entry.id),
         senderId: String(m.sender.id),
         messageId: String(m.message.mid),
         text: m.message.text ?? "",
         payload: m.message.quick_reply?.payload ? String(m.message.quick_reply.payload) : null,
+        storyReplyId: m.message.reply_to?.story?.id ? String(m.message.reply_to.story.id) : null,
+        storyMention,
         timestamp,
       });
     }

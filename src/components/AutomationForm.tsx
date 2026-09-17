@@ -33,6 +33,31 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
         </label>
       </div>
 
+      <fieldset className="group">
+        <legend>Starts when</legend>
+        <div className="row">
+          <label className="check">
+            <input type="checkbox" name="triggers" value="comment" defaultChecked={automation ? automation.triggers.includes("comment") : true} />
+            Someone comments on a post or Reel
+          </label>
+          <label className="check">
+            <input type="checkbox" name="triggers" value="story_reply" defaultChecked={automation?.triggers.includes("story_reply") ?? false} />
+            Someone replies to one of your stories
+          </label>
+          <label className="check">
+            <input type="checkbox" name="triggers" value="dm" defaultChecked={automation?.triggers.includes("dm") ?? false} />
+            Someone DMs you the keyword
+          </label>
+          <label className="check">
+            <input type="checkbox" name="triggers" value="story_mention" defaultChecked={automation?.triggers.includes("story_mention") ?? false} />
+            Someone mentions you in their story
+          </label>
+        </div>
+        <span className="help">
+          Comments go through the opt-in question below. Story replies, story mentions and DMs skip it, because the person messaged you first and the reply window is already open. Story replies and DMs still need a keyword (or an intent description) to match; story mentions fire on any mention.
+        </span>
+      </fieldset>
+
       <div className="row">
         <label>
           Instagram account
@@ -114,7 +139,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </div>
 
       <fieldset className="group">
-        <legend>Step 1: Opt-in question (recommended)</legend>
+        <legend>Opt-in question for comments (recommended)</legend>
         <label className="check">
           <input type="checkbox" name="requireOptIn" defaultChecked={automation?.requireOptIn ?? true} />
           Ask “want it?” with a Yes button before sending anything else
@@ -139,7 +164,25 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </fieldset>
 
       <fieldset className="group">
-        <legend>Optional step 2: Email capture → GoHighLevel</legend>
+        <legend>Optional: Follow gate</legend>
+        <label className="check">
+          <input type="checkbox" name="requireFollow" defaultChecked={automation?.requireFollow ?? false} />
+          Ask them to follow you before sending the link
+        </label>
+        <span className="help">
+          After they say yes, the app checks whether they follow you. If not, it sends the message below with an “I'm following!” button and delivers once they do. People who already follow never see it. If Instagram can't confirm follow status, the link is sent anyway.
+        </span>
+        <label>
+          Follow request message
+          <textarea
+            name="followPrompt"
+            defaultValue={automation?.followPrompt || "One quick thing, {{username}}: the {{offer}} is something I share with my followers 💛 Tap follow on my profile, then hit the button below and I'll send it right over."}
+          />
+        </label>
+      </fieldset>
+
+      <fieldset className="group">
+        <legend>Optional: Email capture → GoHighLevel</legend>
         <label className="check">
           <input type="checkbox" name="collectEmail" defaultChecked={automation?.collectEmail ?? false} />
           Ask for an email address before sending the link
@@ -200,7 +243,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
           </span>
         </label>
         <label>
-          FAQ for the email step
+          FAQ for the email step (only used when email capture is on)
           <textarea
             name="aiFaq"
             defaultValue={automation?.aiFaq ?? ""}

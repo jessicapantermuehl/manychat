@@ -34,7 +34,9 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
   const dmLink = String(form.get("dmLink") ?? "").trim();
   const dmButtonTitle = String(form.get("dmButtonTitle") ?? "").trim();
   const mediaId = String(form.get("mediaId") ?? "").trim();
+  const triggers = (form.getAll("triggers").map(String).filter((t) => ["comment", "story_reply", "story_mention", "dm"].includes(t)) as Automation["triggers"]);
   return {
+    triggers: triggers.length ? triggers : ["comment"],
     name: String(form.get("name") ?? "").trim() || "Untitled automation",
     offerName: String(form.get("offerName") ?? "").trim(),
     igUserId: String(form.get("igUserId") ?? "").trim(),
@@ -59,6 +61,8 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
     requireOptIn: form.get("requireOptIn") === "on",
     optInPrompt: String(form.get("optInPrompt") ?? "").trim(),
     optInButton: String(form.get("optInButton") ?? "").trim().slice(0, 20),
+    requireFollow: form.get("requireFollow") === "on",
+    followPrompt: String(form.get("followPrompt") ?? "").trim(),
   };
 }
 
@@ -89,6 +93,9 @@ export async function saveAutomation(form: FormData) {
     if (!data.igUserId) throw new Error("Choose an Instagram account first.");
     if (!data.dmText) throw new Error("The DM text is required.");
     if (data.collectEmail && !data.emailPrompt) throw new Error("Write the message that asks for the email.");
+    if (data.triggers.includes("dm") && data.keywords.length === 0 && !data.intentDescription) {
+      throw new Error("A DM trigger needs at least one keyword or an intent description, otherwise every message in your inbox would fire it.");
+    }
     await getStore().upsertAutomation({ ...data, id });
     revalidatePath("/");
   } catch (err) {

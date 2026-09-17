@@ -1,6 +1,11 @@
+/** Where an automation can start from. */
+export type TriggerKind = "comment" | "story_reply" | "story_mention" | "dm";
+
 /** A single "comment → DM" rule, the equivalent of a ManyChat comment-growth-tool automation. */
 export interface Automation {
   id: string;
+  /** Which events start this automation. Default: post/reel comments only. */
+  triggers: TriggerKind[];
   /** Human-readable name shown in the dashboard. */
   name: string;
   /** What the person gets, as it should read inside a message: "Healthy Home Guide". Used by {{offer}}. */
@@ -40,6 +45,13 @@ export interface Automation {
   optInPrompt: string;
   /** Title of the Yes button, at most 20 characters. */
   optInButton: string;
+  /**
+   * Optional follow gate: after consent, if the person does not follow the account, ask them to
+   * follow first and deliver once they do. Off by default.
+   */
+  requireFollow: boolean;
+  /** The DM that asks them to follow. Supports {{username}} and {{offer}}. */
+  followPrompt: string;
   /**
    * When true the first DM asks for an email address instead of sending the link.
    * Once the person replies with an email, it is pushed to GoHighLevel and dmText (with the link) is sent.
@@ -102,11 +114,15 @@ export interface MessageEvent {
   text: string;
   /** Payload of a tapped quick reply or postback button, when the message was a tap. */
   payload: string | null;
+  /** Set when the message is a reply to one of the account's stories. */
+  storyReplyId: string | null;
+  /** True when the message is a story that mentions the account. */
+  storyMention: boolean;
   /** Unix timestamp in milliseconds from the webhook. */
   timestamp: number;
 }
 
-export type ConversationState = "awaiting_optin" | "awaiting_email" | "done" | "abandoned";
+export type ConversationState = "awaiting_optin" | "awaiting_follow" | "awaiting_email" | "done" | "abandoned";
 
 /** Tracks an email-capture conversation with one person. */
 export interface Conversation {

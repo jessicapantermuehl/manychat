@@ -2,9 +2,9 @@ import { getAi, type Ai, type Triage } from "./ai";
 import { env, hasGhl } from "./env";
 import { GhlApiError, GhlClient } from "./ghl";
 import { buildDmMessage, buildPostbackButtonMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
-import { eligibleAutomations, findAutomation, pickPreferred, pickRandom, renderTemplate } from "./matching";
+import { eligibleAutomations, eligibleInboundAutomations, findAutomation, keywordMatches, pickPreferred, pickRandom, renderTemplate } from "./matching";
 import type { Store } from "./store";
-import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent } from "./types";
+import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent, TriggerKind } from "./types";
 import { extractEmail, looksLikeChangedMind, looksLikeNo, looksLikeStop, looksLikeYes } from "./webhook";
 
 export interface RunnerDeps {
@@ -45,6 +45,11 @@ const MAX_OPTIN_ATTEMPTS = 2;
 
 export const OPT_IN_YES = "CS_OPTIN_YES";
 export const OPT_IN_NO = "CS_OPTIN_NO";
+export const FOLLOW_DONE = "CS_FOLLOW_DONE";
+const DEFAULT_FOLLOW_PROMPT = "One quick thing, {{username}}: the {{offer}} is something I share with my followers 💛 Tap follow on my profile, then hit the button below and I'll send it right over.";
+const DEFAULT_FOLLOW_BUTTON = "I'm following!";
+/** Ask to follow this many times before going quiet. */
+const MAX_FOLLOW_ATTEMPTS = 2;
 const DEFAULT_OPT_IN_PROMPT = "Hey {{username}}! Thanks so much for asking for the {{offer}}. Just to confirm, would you like me to send you the link?";
 const DEFAULT_OPT_IN_PROMPT_NO_OFFER = "Hey {{username}}! Just to confirm, would you like me to send you the link?";
 const DEFAULT_OPT_IN_BUTTON = "Yes please!";
@@ -81,6 +86,26 @@ async function sendFollowUps(client: InstagramClient, igUserId: string, igsid: s
     }
   }
   if (sent > 0) details.push(`${sent} follow-up${sent === 1 ? "" : "s"} sent`);
+}
+
+function followMessage(automation: Automation, username: string): OutgoingMessage {
+  const prompt = renderTemplate(automation.followPrompt.trim() || DEFAULT_FOLLOW_PROMPT, vars(username, automation));
+  return buildPostbackButtonMessage(prompt, [{ title: DEFAULT_FOLLOW_BUTTON, payload: FOLLOW_DONE }]);
+}
+
+/**
+ * Asks Instagram whether this person follows the account. Fails open: if the lookup errors
+ * (permissions, rate limit) we treat them as following rather than block a real request.
+ */
+async function isFollowing(client: InstagramClient, igsid: string, log: (m: string, e?: unknown) => void): Promise<{ following: boolean; checked: boolean }> {
+  try {
+    const profile = await client.getUserProfile(igsid);
+    if (typeof profile.is_user_follow_business !== "boolean") return { following: true, checked: false };
+    return { following: profile.is_user_follow_business, checked: true };
+  } catch (err) {
+    log("follow check failed", err);
+    return { following: true, checked: false };
+  }
 }
 
 function linkMessage(automation: Automation, username: string): OutgoingMessage {
@@ -244,23 +269,186 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
 }
 
 /**
- * Processes one inbound DM or button tap. Only conversations we started are acted on; every other
- * message is ignored so the app never talks to people who did not comment first.
+ * The step after consent, inside an open window: follow gate (optional) → email question
+ * (optional) → link + follow-ups. Shared by the opt-in Yes, the follow-gate pass and inbound triggers.
+ */
+async function deliverAfterConsent(
+  event: MessageEvent,
+  conversation: Conversation,
+  automation: Automation,
+  client: InstagramClient,
+  deps: RunnerDeps,
+  base: Base,
+  finish: Finish,
+  save: Save,
+  details: string[],
+  opts: { skipFollowGate?: boolean } = {},
+): Promise<ActivityRecord> {
+  const log = deps.log ?? (() => {});
+  try {
+    if (automation.requireFollow && !opts.skipFollowGate) {
+      const follow = await isFollowing(client, event.senderId, log);
+      if (!follow.checked) details.push("follow status unknown, skipped gate");
+      if (follow.checked && !follow.following) {
+        await client.sendMessage(event.igUserId, event.senderId, followMessage(automation, conversation.username));
+        await save({ state: "awaiting_follow", attempts: 1 });
+        details.push("asked to follow first");
+        return finish({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") });
+      }
+      if (follow.checked) details.push("already following");
+    }
+    if (automation.collectEmail && automation.emailPrompt.trim()) {
+      await client.sendMessage(event.igUserId, event.senderId, emailPromptMessage(automation, conversation.username));
+      await save({ state: "awaiting_email", attempts: 1 });
+      details.push("asked for email");
+      return finish({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") });
+    }
+    await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
+    details.push("link sent");
+    await sendFollowUps(client, event.igUserId, event.senderId, automation, conversation.username, details, log);
+    await save({ state: "done" });
+    return finish({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") });
+  } catch (err) {
+    log("delivery DM failed", err);
+    details.push(`DM failed: ${describeError(err)}`);
+    return finish({ ...base, automationId: automation.id, status: "failed", detail: details.join("; ") });
+  }
+}
+
+/** Which inbound trigger kind a message is, or null for a plain button tap. */
+function inboundKind(event: MessageEvent): Exclude<TriggerKind, "comment"> | null {
+  if (event.payload) return null;
+  if (event.storyMention) return "story_mention";
+  if (event.storyReplyId) return "story_reply";
+  if (event.text.trim()) return "dm";
+  return null;
+}
+
+/**
+ * A message that is not part of a conversation we are running: a story reply, a story mention or
+ * a keyword DM. Because the person messaged first, the 24-hour window is already open, so no
+ * opt-in step is needed; delivery starts straight away.
+ */
+async function handleInboundTrigger(event: MessageEvent, existing: Conversation | null, deps: RunnerDeps): Promise<ActivityRecord | null> {
+  const { store } = deps;
+  const log = deps.log ?? (() => {});
+  const kind = inboundKind(event);
+  if (!kind) return null;
+
+  const automations = await store.listAutomations(event.igUserId);
+  const candidates = eligibleInboundAutomations(kind, event.igUserId, automations);
+  if (candidates.length === 0) return null;
+
+  // Story mentions have no text to match; every other kind matches on keywords first, then AI intent.
+  let automation: Automation | null = null;
+  let matchedBy = "keyword";
+  if (kind === "story_mention") {
+    automation = pickPreferred(candidates);
+  } else {
+    automation = pickPreferred(candidates.filter((a) => a.keywords.length > 0 && keywordMatches(event.text, a.keywords, a.matchMode)));
+    const ai = deps.ai?.() ?? null;
+    if (!automation && ai) {
+      const withIntent = candidates.filter((a) => a.intentDescription.trim());
+      if (withIntent.length > 0) {
+        try {
+          const id = await ai.classifyIntent(event.text, withIntent.map((a) => ({ id: a.id, name: a.name, intentDescription: a.intentDescription })));
+          automation = pickPreferred(withIntent.filter((a) => a.id === id));
+          matchedBy = "intent";
+        } catch (err) {
+          log("intent matching failed", err);
+        }
+      }
+    }
+  }
+  if (!automation) return null;
+
+  const client = await deps.clientFor(event.igUserId);
+  const label = kind === "story_reply" ? "story reply" : kind === "story_mention" ? "story mention" : "DM keyword";
+  const base: Base = {
+    commentId: event.messageId,
+    igUserId: event.igUserId,
+    fromUsername: existing?.username ?? "",
+    commentText: event.text || (kind === "story_mention" ? "[story mention]" : ""),
+  };
+  const finish: Finish = async (record) => {
+    try {
+      await store.recordActivity(record);
+    } catch (err) {
+      log("failed to record activity", err);
+    }
+    return record;
+  };
+  if (!client) {
+    return finish({ ...base, automationId: automation.id, status: "failed", detail: `${label} trigger; no access token for this account` });
+  }
+
+  // Fill in the username for the templates when we do not know it yet.
+  let username = existing?.username ?? "";
+  if (!username) {
+    try {
+      username = (await client.getUserProfile(event.senderId)).username ?? "";
+    } catch (err) {
+      log("profile lookup failed", err);
+    }
+  }
+  const conversation: Conversation = {
+    igUserId: event.igUserId,
+    igsid: event.senderId,
+    username,
+    automationId: automation.id,
+    commentId: event.messageId,
+    state: "awaiting_optin",
+    attempts: 1,
+    email: null,
+    ghlContactId: null,
+    lastMessageId: event.messageId,
+    closedReason: null,
+    reopened: false,
+  };
+  const save: Save = (patch) => store.upsertConversation({ ...conversation, ...patch, lastMessageId: event.messageId });
+  const details = [`${label} trigger`, ...(matchedBy === "intent" ? ["matched by AI intent"] : [])];
+  return deliverAfterConsent(event, conversation, automation, client, deps, { ...base, fromUsername: username }, finish, save, details);
+}
+
+/**
+ * Processes one inbound DM or button tap. Conversations the app is running continue; a message
+ * from anyone else is checked against story-reply, story-mention and DM-keyword triggers, and is
+ * otherwise ignored so the app never talks to people who did not ask for something.
  */
 export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps): Promise<ActivityRecord | null> {
   const { store } = deps;
   const log = deps.log ?? (() => {});
 
   const conversation = await store.getConversation(event.igUserId, event.senderId);
-  if (!conversation) return null;
-  if (conversation.state === "done") return null;
   // Meta can redeliver a webhook; never act on the same message twice.
-  if (conversation.lastMessageId && conversation.lastMessageId === event.messageId) return null;
-  // A closed conversation stays closed, with one exception: they tapped No by accident and say so.
+  if (conversation?.lastMessageId && conversation.lastMessageId === event.messageId) return null;
+
+  if (!conversation) return handleInboundTrigger(event, null, deps);
+
+  // A stop word after a finished conversation still counts: mark it so no later keyword re-triggers.
+  if ((conversation.state === "done" || conversation.state === "abandoned") && !event.payload && looksLikeStop(event.text)) {
+    if (conversation.closedReason !== "stopped") {
+      await store.upsertConversation({ ...conversation, state: "abandoned", closedReason: "stopped", lastMessageId: event.messageId });
+      const record: ActivityRecord = { commentId: conversation.commentId, igUserId: event.igUserId, fromUsername: conversation.username, commentText: event.text, automationId: conversation.automationId, status: "skipped", detail: "asked to stop; will not be messaged again" };
+      try {
+        await store.recordActivity(record);
+      } catch (err) {
+        log("failed to record activity", err);
+      }
+      return record;
+    }
+    return null;
+  }
+
+  if (conversation.state === "done") return handleInboundTrigger(event, conversation, deps);
   if (conversation.state === "abandoned") {
+    // Someone who asked us to stop is never messaged again.
+    if (conversation.closedReason === "stopped") return null;
+    // They tapped No by accident and say so: send the opt-in question once more.
     const canReopen = conversation.closedReason === "declined" && !conversation.reopened && !event.payload && looksLikeChangedMind(event.text);
-    if (!canReopen) return null;
-    return reopenAfterDecline(event, conversation, deps);
+    if (canReopen) return reopenAfterDecline(event, conversation, deps);
+    // Otherwise a fresh keyword or story reply can start a new flow.
+    return handleInboundTrigger(event, conversation, deps);
   }
 
   const base = {
@@ -306,7 +494,44 @@ export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps):
   if (conversation.state === "awaiting_optin") {
     return handleOptInReply(event, conversation, automation, client, deps, base, finish, save);
   }
+  if (conversation.state === "awaiting_follow") {
+    return handleFollowReply(event, conversation, automation, client, deps, base, finish, save);
+  }
   return handleEmailReply(event, conversation, automation, client, deps, base, finish, save);
+}
+
+/** They were asked to follow. On any reply, re-check; deliver once they follow, remind once, then go quiet. */
+async function handleFollowReply(
+  event: MessageEvent,
+  conversation: Conversation,
+  automation: Automation,
+  client: InstagramClient,
+  deps: RunnerDeps,
+  base: Base,
+  finish: Finish,
+  save: Save,
+): Promise<ActivityRecord> {
+  const log = deps.log ?? (() => {});
+  const follow = await isFollowing(client, event.senderId, log);
+  if (!follow.checked || follow.following) {
+    const details = [follow.checked ? "now following" : "follow status unknown, continuing"];
+    return deliverAfterConsent(event, conversation, automation, client, deps, base, finish, save, details, { skipFollowGate: true });
+  }
+  if (conversation.attempts >= MAX_FOLLOW_ATTEMPTS) {
+    await save({ state: "abandoned", closedReason: "no_response" });
+    return finish({ ...base, automationId: automation.id, status: "skipped", detail: "still not following after reminder; conversation closed" });
+  }
+  try {
+    const nudge = event.payload === FOLLOW_DONE
+      ? "Hmm, I don't see the follow on my side yet. It can take a moment; try tapping follow on my profile once more, then the button again 💛"
+      : renderTemplate(automation.followPrompt.trim() || DEFAULT_FOLLOW_PROMPT, vars(conversation.username, automation));
+    await client.sendMessage(event.igUserId, event.senderId, buildPostbackButtonMessage(nudge, [{ title: DEFAULT_FOLLOW_BUTTON, payload: FOLLOW_DONE }]));
+    await save({ attempts: conversation.attempts + 1 });
+    return finish({ ...base, automationId: automation.id, status: "sent", detail: "not following yet; asked again" });
+  } catch (err) {
+    log("follow reminder failed", err);
+    return finish({ ...base, automationId: automation.id, status: "failed", detail: `follow reminder failed: ${describeError(err)}` });
+  }
 }
 
 /** They tapped No, then said "wait, I do want it": send the opt-in question once more. */
@@ -369,22 +594,8 @@ async function handleOptInReply(
     }
   }
 
-  // They said yes: the 24-hour window is open. Either ask for the email or deliver the link.
-  try {
-    if (automation.collectEmail && automation.emailPrompt.trim()) {
-      await client.sendMessage(event.igUserId, event.senderId, emailPromptMessage(automation, conversation.username));
-      await save({ state: "awaiting_email", attempts: 1 });
-      return finish({ ...base, automationId: automation.id, status: "sent", detail: "opted in; asked for email" });
-    }
-    await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
-    const details = ["opted in; link sent"];
-    await sendFollowUps(client, event.igUserId, event.senderId, automation, conversation.username, details, log);
-    await save({ state: "done" });
-    return finish({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") });
-  } catch (err) {
-    log("post-opt-in DM failed", err);
-    return finish({ ...base, automationId: automation.id, status: "failed", detail: `DM after opt-in failed: ${describeError(err)}` });
-  }
+  // They said yes: the 24-hour window is open. Follow gate → email question → link.
+  return deliverAfterConsent(event, conversation, automation, client, deps, base, finish, save, ["opted in"]);
 }
 
 async function handleEmailReply(

@@ -17,6 +17,7 @@ function fakeInstagram() {
 
 const rule: Automation = {
   id: "r1",
+  triggers: ["comment"],
   name: "Gut guide",
   offerName: "Gut Guide",
   igUserId: "acct",
@@ -41,6 +42,8 @@ const rule: Automation = {
   requireOptIn: true,
   optInPrompt: "Hey {{username}}, want the guide?",
   optInButton: "Yes please!",
+  requireFollow: false,
+  followPrompt: "",
 };
 
 const comment: CommentEvent = {
@@ -55,8 +58,8 @@ const comment: CommentEvent = {
   time: Math.floor(Date.now() / 1000),
 };
 
-const tap = (payload: string, id = `tap-${payload}-${Math.random()}`): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: id, text: "", payload, timestamp: Date.now() });
-const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}-${Math.random()}`, text, payload: null, timestamp: Date.now() });
+const tap = (payload: string, id = `tap-${payload}-${Math.random()}`): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: id, text: "", payload, storyReplyId: null, storyMention: false, timestamp: Date.now() });
+const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}-${Math.random()}`, text, payload: null, storyReplyId: null, storyMention: false, timestamp: Date.now() });
 
 describe("opt-in flow", () => {
   it("the private reply is the opt-in question with a single Yes button inside the bubble", async () => {

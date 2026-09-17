@@ -147,6 +147,13 @@ export class InstagramClient {
     });
   }
 
+  /** Looks up a messaging user (by Instagram-scoped id), including whether they follow the account. */
+  getUserProfile(igsid: string) {
+    return this.request<{ id: string; username?: string; name?: string; is_user_follow_business?: boolean; is_business_follow_user?: boolean }>(igsid, {
+      query: { fields: "name,username,is_user_follow_business,is_business_follow_user" },
+    });
+  }
+
   /** Returns the connected account's id and username. */
   me() {
     return this.request<{ id: string; user_id: string; username: string }>("me", {

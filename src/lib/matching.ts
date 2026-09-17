@@ -66,6 +66,20 @@ export function eligibleAutomations(event: CommentEvent, automations: Automation
   });
 }
 
+/**
+ * Active rules that start from a story reply, story mention or keyword DM. Keyword matching is
+ * applied here; DM-triggered rules must have keywords or an intent description so the app never
+ * answers every message in the inbox.
+ */
+export function eligibleInboundAutomations(kind: "story_reply" | "story_mention" | "dm", igUserId: string, automations: Automation[]): Automation[] {
+  return automations.filter((a) => {
+    if (!a.active || a.igUserId !== igUserId) return false;
+    if (!a.triggers.includes(kind)) return false;
+    if (kind === "dm" && a.keywords.length === 0 && !a.intentDescription.trim()) return false;
+    return true;
+  });
+}
+
 /** Post-specific rules win over account-wide ones; among equals the oldest wins. */
 export function pickPreferred(candidates: Automation[]): Automation | null {
   if (candidates.length === 0) return null;

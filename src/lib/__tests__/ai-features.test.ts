@@ -37,6 +37,7 @@ function fakeAi(overrides: Partial<Ai> = {}): Ai & { calls: string[] } {
 
 const rule: Automation = {
   id: "r1",
+  triggers: ["comment"],
   name: "Gut guide",
   offerName: "Gut Guide",
   igUserId: "acct",
@@ -61,6 +62,8 @@ const rule: Automation = {
   requireOptIn: false,
   optInPrompt: "",
   optInButton: "",
+  requireFollow: false,
+  followPrompt: "",
 };
 
 const comment = (text: string): CommentEvent => ({
@@ -75,7 +78,7 @@ const comment = (text: string): CommentEvent => ({
   time: Math.floor(Date.now() / 1000),
 });
 
-const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, payload: null, timestamp: Date.now() });
+const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, payload: null, storyReplyId: null, storyMention: false, timestamp: Date.now() });
 
 describe("AI intent matching", () => {
   it("fires the automation when the comment expresses the intent without the keyword", async () => {

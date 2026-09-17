@@ -28,6 +28,7 @@ function fakeGhl(opts: { fail?: boolean } = {}) {
 
 const rule: Automation = {
   id: "r1",
+  triggers: ["comment"],
   name: "Guide",
   offerName: "",
   igUserId: "acct",
@@ -52,6 +53,8 @@ const rule: Automation = {
   requireOptIn: false,
   optInPrompt: "",
   optInButton: "",
+  requireFollow: false,
+  followPrompt: "",
 };
 
 const comment: CommentEvent = {
@@ -66,7 +69,7 @@ const comment: CommentEvent = {
   time: Math.floor(Date.now() / 1000),
 };
 
-const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, payload: null, timestamp: Date.now() });
+const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}`, text, payload: null, storyReplyId: null, storyMention: false, timestamp: Date.now() });
 
 describe("email capture flow", () => {
   it("asks for the email first and remembers the conversation", async () => {

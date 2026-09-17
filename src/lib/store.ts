@@ -31,6 +31,7 @@ export interface Store {
 
 type AutomationRow = {
   id: string;
+  triggers: Automation["triggers"];
   name: string;
   offer_name: string;
   ig_user_id: string;
@@ -55,6 +56,8 @@ type AutomationRow = {
   require_opt_in: boolean;
   opt_in_prompt: string;
   opt_in_button: string;
+  require_follow: boolean;
+  follow_prompt: string;
   created_at: string;
 };
 
@@ -97,6 +100,7 @@ function rowToConversation(r: ConversationRow): Conversation {
 function rowToAutomation(r: AutomationRow): Automation {
   return {
     id: r.id,
+    triggers: r.triggers?.length ? r.triggers : ["comment"],
     name: r.name,
     offerName: r.offer_name ?? "",
     igUserId: r.ig_user_id,
@@ -121,6 +125,8 @@ function rowToAutomation(r: AutomationRow): Automation {
     requireOptIn: r.require_opt_in ?? true,
     optInPrompt: r.opt_in_prompt ?? "",
     optInButton: r.opt_in_button ?? "",
+    requireFollow: r.require_follow ?? false,
+    followPrompt: r.follow_prompt ?? "",
     createdAt: r.created_at,
   };
 }
@@ -145,6 +151,7 @@ export class SupabaseStore implements Store {
   async upsertAutomation(a: Omit<Automation, "id" | "createdAt"> & { id?: string }) {
     const row = {
       ...(a.id ? { id: a.id } : {}),
+      triggers: a.triggers,
       name: a.name,
       offer_name: a.offerName,
       ig_user_id: a.igUserId,
@@ -169,6 +176,8 @@ export class SupabaseStore implements Store {
       require_opt_in: a.requireOptIn,
       opt_in_prompt: a.optInPrompt,
       opt_in_button: a.optInButton,
+      require_follow: a.requireFollow,
+      follow_prompt: a.followPrompt,
     };
     const { data, error } = await this.db.from("cs_automations").upsert(row).select("*").single();
     if (error) throw error;
@@ -366,6 +375,7 @@ export function automationsFromEnv(json: string): Automation[] {
   const parsed = JSON.parse(json) as Array<Partial<Automation>>;
   return parsed.map((a, i) => ({
     id: a.id ?? `env-${i}`,
+    triggers: a.triggers ?? ["comment"],
     name: a.name ?? `Automation ${i + 1}`,
     offerName: a.offerName ?? "",
     igUserId: a.igUserId ?? env.igUserId,
@@ -390,6 +400,8 @@ export function automationsFromEnv(json: string): Automation[] {
     requireOptIn: a.requireOptIn ?? true,
     optInPrompt: a.optInPrompt ?? "",
     optInButton: a.optInButton ?? "",
+    requireFollow: a.requireFollow ?? false,
+    followPrompt: a.followPrompt ?? "",
   }));
 }
 

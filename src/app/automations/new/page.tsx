@@ -14,6 +14,7 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
   const preset: Automation | undefined = has
     ? {
         id: "",
+        triggers: ["comment"],
         name: params.name ?? "",
         offerName: params.offerName ?? "",
         igUserId: params.igUserId ?? "",
@@ -38,6 +39,8 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
         requireOptIn: true,
         optInPrompt: params.optInPrompt ?? "",
         optInButton: "",
+        requireFollow: false,
+        followPrompt: "",
       }
     : undefined;
 

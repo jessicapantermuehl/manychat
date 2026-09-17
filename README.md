@@ -24,6 +24,24 @@ Instagram API with Instagram Login.
 5. Every comment and reply is logged on the dashboard as `sent`, `skipped`, `failed` or `captured`
    with the reason.
 
+### Story replies, story mentions and keyword DMs
+
+Each automation chooses what starts it: post/Reel comments (default), replies to your stories,
+mentions of your account in someone's story, or a DM containing the keyword. Comments go through
+the opt-in question. The other three skip it, because the person messaged first and the 24-hour
+window is already open, so the link (or the email question) goes straight out. Story replies and
+DMs still need a keyword or an intent description to match; story mentions fire on any mention.
+Stop words are honoured in every state, and a finished conversation can be re-triggered by a new
+keyword.
+
+### Follow gate (optional)
+
+Tick **Ask them to follow you before sending the link** and, after consent, the app checks
+whether the person follows the account. Non-followers get your follow request with an
+"I'm following!" button and receive the link once they follow; existing followers never see it.
+If Instagram cannot report follow status the link is sent anyway, so a real request is never
+blocked by an API hiccup.
+
 ### Extra messages after the link
 
 Each automation can send up to three more DMs right after the link (or after the email

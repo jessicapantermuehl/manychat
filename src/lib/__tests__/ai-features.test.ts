@@ -55,6 +55,7 @@ const rule: Automation = {
   ghlTags: [],
   deliverByEmailOnly: false,
   emailSentText: "",
+  followUpMessages: [],
   intentDescription: "someone asking for the gut health guide",
   aiFaq: "",
   requireOptIn: false,

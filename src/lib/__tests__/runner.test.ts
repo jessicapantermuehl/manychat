@@ -33,6 +33,7 @@ const rule: Automation = {
   ghlTags: [],
   deliverByEmailOnly: false,
   emailSentText: "",
+  followUpMessages: [],
   intentDescription: "",
   aiFaq: "",
   requireOptIn: false,

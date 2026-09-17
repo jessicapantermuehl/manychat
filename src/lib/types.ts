@@ -60,6 +60,11 @@ export interface Automation {
   /** Confirmation DM used when deliverByEmailOnly is on. Supports {{username}} and {{offer}}. */
   emailSentText: string;
   /**
+   * Extra DMs sent in order right after the link (or the email confirmation), inside the open
+   * 24-hour window. Each may use {{username}}, {{offer}} and {{link}}. Max 3.
+   */
+  followUpMessages: string[];
+  /**
    * Plain-English description of what a commenter is asking for when this rule should fire,
    * e.g. "someone asking for the gut health guide". Empty = keyword matching only.
    */

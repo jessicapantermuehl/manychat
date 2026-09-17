@@ -88,6 +88,19 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
         </span>
       </label>
 
+      <label>
+        Extra messages after the link (optional)
+        <textarea
+          name="followUpMessages"
+          rows={5}
+          defaultValue={automation?.followUpMessages.join("\n\n") ?? ""}
+          placeholder={"Start with page 4, it's the part most people skip.\n\nAny questions about it? Just reply here, it's really me."}
+        />
+        <span className="help">
+          Up to 3, sent one after another right after the link. Separate messages with a blank line. Needs the opt-in step below, because Meta allows only one message per comment before they reply.
+        </span>
+      </label>
+
       <div className="row">
         <label>
           Link

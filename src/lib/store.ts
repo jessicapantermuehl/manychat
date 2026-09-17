@@ -49,6 +49,7 @@ type AutomationRow = {
   ghl_tags: string[];
   deliver_by_email_only: boolean;
   email_sent_text: string;
+  follow_up_messages: string[];
   intent_description: string;
   ai_faq: string;
   require_opt_in: boolean;
@@ -114,6 +115,7 @@ function rowToAutomation(r: AutomationRow): Automation {
     ghlTags: r.ghl_tags ?? [],
     deliverByEmailOnly: r.deliver_by_email_only ?? false,
     emailSentText: r.email_sent_text ?? "",
+    followUpMessages: r.follow_up_messages ?? [],
     intentDescription: r.intent_description ?? "",
     aiFaq: r.ai_faq ?? "",
     requireOptIn: r.require_opt_in ?? true,
@@ -161,6 +163,7 @@ export class SupabaseStore implements Store {
       ghl_tags: a.ghlTags,
       deliver_by_email_only: a.deliverByEmailOnly,
       email_sent_text: a.emailSentText,
+      follow_up_messages: a.followUpMessages,
       intent_description: a.intentDescription,
       ai_faq: a.aiFaq,
       require_opt_in: a.requireOptIn,
@@ -381,6 +384,7 @@ export function automationsFromEnv(json: string): Automation[] {
     ghlTags: a.ghlTags ?? [],
     deliverByEmailOnly: a.deliverByEmailOnly ?? false,
     emailSentText: a.emailSentText ?? "",
+    followUpMessages: a.followUpMessages ?? [],
     intentDescription: a.intentDescription ?? "",
     aiFaq: a.aiFaq ?? "",
     requireOptIn: a.requireOptIn ?? true,

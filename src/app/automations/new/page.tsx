@@ -32,6 +32,7 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
         ghlTags: [],
         deliverByEmailOnly: false,
         emailSentText: "",
+        followUpMessages: [],
         intentDescription: params.intentDescription ?? "",
         aiFaq: "",
         requireOptIn: true,

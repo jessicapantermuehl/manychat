@@ -46,6 +46,7 @@ const rule: Automation = {
   ghlTags: ["instagram", "guide"],
   deliverByEmailOnly: false,
   emailSentText: "",
+  followUpMessages: [],
   intentDescription: "",
   aiFaq: "",
   requireOptIn: false,

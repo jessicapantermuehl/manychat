@@ -24,6 +24,13 @@ Instagram API with Instagram Login.
 5. Every comment and reply is logged on the dashboard as `sent`, `skipped`, `failed` or `captured`
    with the reason.
 
+### Extra messages after the link
+
+Each automation can send up to three more DMs right after the link (or after the email
+confirmation), in order, inside the 24-hour window the opt-in tap opened. Use them for a
+"start here" tip or a soft next step. They need the opt-in step, since Meta allows only one
+message per comment before the person replies.
+
 ### Why the opt-in step matters
 
 Meta allows exactly one automatic message per comment (the private reply) and it does **not**

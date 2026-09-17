@@ -63,6 +63,25 @@ function optInMessage(automation: Automation, username: string): OutgoingMessage
   return buildQuickReplyMessage(prompt, [{ title: yes, payload: OPT_IN_YES }]);
 }
 
+const MAX_FOLLOW_UPS = 3;
+
+/** Sends the automation's extra messages in order. Only valid inside an open messaging window. */
+async function sendFollowUps(client: InstagramClient, igUserId: string, igsid: string, automation: Automation, username: string, details: string[], log: (m: string, e?: unknown) => void) {
+  const messages = automation.followUpMessages.map((m) => m.trim()).filter(Boolean).slice(0, MAX_FOLLOW_UPS);
+  let sent = 0;
+  for (const m of messages) {
+    try {
+      await client.sendMessage(igUserId, igsid, { text: renderTemplate(m, vars(username, automation)).slice(0, 1000) });
+      sent += 1;
+    } catch (err) {
+      log("follow-up failed", err);
+      details.push(`follow-up ${sent + 1} failed: ${describeError(err)}`);
+      break;
+    }
+  }
+  if (sent > 0) details.push(`${sent} follow-up${sent === 1 ? "" : "s"} sent`);
+}
+
 function linkMessage(automation: Automation, username: string): OutgoingMessage {
   let text = renderTemplate(automation.dmText, vars(username, automation));
   const link = automation.dmLink?.trim() ?? "";
@@ -196,6 +215,7 @@ export async function handleCommentEvent(event: CommentEvent, deps: RunnerDeps):
       message = linkMessage(automation, event.fromUsername);
       nextState = "done";
       details.push("DM sent");
+      if (automation.followUpMessages.some((m) => m.trim())) details.push("follow-ups skipped: they need the opt-in step (Meta allows one message per comment)");
     }
 
     const res = await client.sendPrivateReply(event.igUserId, event.commentId, message);
@@ -356,8 +376,10 @@ async function handleOptInReply(
       return finish({ ...base, automationId: automation.id, status: "sent", detail: "opted in; asked for email" });
     }
     await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
+    const details = ["opted in; link sent"];
+    await sendFollowUps(client, event.igUserId, event.senderId, automation, conversation.username, details, log);
     await save({ state: "done" });
-    return finish({ ...base, automationId: automation.id, status: "sent", detail: "opted in; link sent" });
+    return finish({ ...base, automationId: automation.id, status: "sent", detail: details.join("; ") });
   } catch (err) {
     log("post-opt-in DM failed", err);
     return finish({ ...base, automationId: automation.id, status: "failed", detail: `DM after opt-in failed: ${describeError(err)}` });
@@ -438,6 +460,7 @@ async function handleEmailReply(
       await client.sendMessage(event.igUserId, event.senderId, linkMessage(automation, conversation.username));
       details.push("link sent");
     }
+    await sendFollowUps(client, event.igUserId, event.senderId, automation, conversation.username, details, log);
     await save({ state: "done", email, ghlContactId });
     return finish({ ...base, automationId: automation.id, status: "captured", detail: details.join("; ") });
   } catch (err) {

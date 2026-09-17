@@ -13,6 +13,16 @@ function lines(value: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+/** Paragraph-separated messages: one message per block, blank line between blocks. */
+function paragraphs(value: FormDataEntryValue | null): string[] {
+  return String(value ?? "")
+    .replace(/\r\n/g, "\n")
+    .split(/\n\s*\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 function commaList(value: FormDataEntryValue | null): string[] {
   return String(value ?? "")
     .split(/[,\n]/)
@@ -43,6 +53,7 @@ function parseForm(form: FormData): Omit<Automation, "id" | "createdAt"> {
     ghlTags: commaList(form.get("ghlTags")),
     deliverByEmailOnly: form.get("deliverByEmailOnly") === "on",
     emailSentText: String(form.get("emailSentText") ?? "").trim(),
+    followUpMessages: paragraphs(form.get("followUpMessages")),
     intentDescription: String(form.get("intentDescription") ?? "").trim(),
     aiFaq: String(form.get("aiFaq") ?? "").trim(),
     requireOptIn: form.get("requireOptIn") === "on",

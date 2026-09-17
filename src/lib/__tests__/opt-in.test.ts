@@ -34,6 +34,7 @@ const rule: Automation = {
   ghlTags: [],
   deliverByEmailOnly: false,
   emailSentText: "",
+  followUpMessages: [],
   intentDescription: "",
   aiFaq: "",
   requireOptIn: true,
@@ -299,5 +300,34 @@ describe("link delivery", () => {
     await handleCommentEvent(comment, deps2);
     await handleMessageEvent(tap(OPT_IN_YES), deps2);
     expect(ig2.calls.at(-1)!.body.message.text).toBe("Here: https://example.com/guide");
+  });
+});
+
+describe("extra messages after the link", () => {
+  it("sends them in order after the link, with placeholders filled", async () => {
+    const store = new MemoryStore([{ ...rule, followUpMessages: ["Start with page 4, {{username}}.", "Questions about the {{offer}}? Reply here."] }]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    const result = await handleMessageEvent(tap(OPT_IN_YES), deps);
+
+    const texts = ig.calls.slice(1).map((c) => (c.body.message as { text: string }).text);
+    expect(texts).toEqual(["Here fan: https://example.com/guide", "Start with page 4, fan.", "Questions about the Gut Guide? Reply here."]);
+    expect(result?.detail).toBe("opted in; link sent; 2 follow-ups sent");
+  });
+
+  it("caps at three and notes when they cannot be sent without the opt-in step", async () => {
+    const store = new MemoryStore([{ ...rule, followUpMessages: ["a", "b", "c", "d"] }]);
+    const ig = fakeInstagram();
+    const deps = { store, clientFor: async () => ig.client };
+    await handleCommentEvent(comment, deps);
+    await handleMessageEvent(tap(OPT_IN_YES), deps);
+    expect(ig.calls).toHaveLength(1 + 1 + 3);
+
+    const direct = new MemoryStore([{ ...rule, requireOptIn: false, followUpMessages: ["a"] }]);
+    const ig2 = fakeInstagram();
+    const r = await handleCommentEvent(comment, { store: direct, clientFor: async () => ig2.client });
+    expect(r.detail).toContain("follow-ups skipped");
+    expect(ig2.calls).toHaveLength(1);
   });
 });

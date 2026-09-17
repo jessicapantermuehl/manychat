@@ -54,6 +54,7 @@ function automation(overrides: Partial<Automation>): Automation {
     ghlTags: [],
     deliverByEmailOnly: false,
     emailSentText: "",
+    followUpMessages: [],
     intentDescription: "",
     aiFaq: "",
     requireOptIn: false,

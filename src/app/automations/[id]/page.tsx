@@ -26,8 +26,9 @@ export default async function EditAutomationPage({
       </header>
       {query.error && <div className="notice bad">Could not save: {query.error}</div>}
       {query.copied && <div className="notice ok">This is a copy, saved as paused. Change the name, keyword and link, tick Active, then save.</div>}
+      {query.mediaId && <div className="notice ok">Post selected. Click “Save automation” to apply it.</div>}
       <section className="card">
-        <AutomationForm automation={automation} accounts={accounts} envIgUserId={env.igUserId} />
+        <AutomationForm automation={query.mediaId ? { ...automation, mediaId: query.mediaId } : automation} accounts={accounts} envIgUserId={env.igUserId} />
       </section>
     </>
   );

@@ -54,6 +54,7 @@ export default async function NewAutomationPage({ searchParams }: { searchParams
         </div>
       </header>
       {params.error && <div className="notice bad">Could not save: {params.error}</div>}
+      {params.mediaId && <div className="notice ok">Post selected. Fill in the rest and save.</div>}
       <section className="card">
         <AutomationForm accounts={accounts} envIgUserId={env.igUserId} automation={preset} />
       </section>

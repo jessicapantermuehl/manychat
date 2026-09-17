@@ -4,8 +4,12 @@ import { getStore } from "@/lib/store";
 export const dynamic = "force-dynamic";
 
 /** Lists recent posts so you can copy a media id (or jump straight to creating a rule for it). */
-export default async function MediaPage({ params }: { params: Promise<{ igUserId: string }> }) {
+export default async function MediaPage({ params, searchParams }: { params: Promise<{ igUserId: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
   const { igUserId } = await params;
+  const query = await searchParams;
+  // Where to send the chosen post: back to the form that opened the picker, or a new automation.
+  const returnTo = query.return && query.return.startsWith("/") ? query.return : `/automations/new?igUserId=${igUserId}`;
+  const targetFor = (mediaId: string) => `${returnTo}${returnTo.includes("?") ? "&" : "?"}mediaId=${encodeURIComponent(mediaId)}`;
   const client = await defaultClientFor(getStore(), igUserId);
 
   let items: Array<{ id: string; caption?: string; media_type: string; permalink: string; timestamp: string }> = [];
@@ -23,7 +27,7 @@ export default async function MediaPage({ params }: { params: Promise<{ igUserId
     <>
       <header className="top">
         <div><h1>Pick a post</h1><div className="sub">Scope an automation to one post or Reel.</div></div>
-        <a className="btn secondary" href="/">Cancel</a>
+        <a className="btn secondary" href={query.return && query.return.startsWith("/") ? query.return : "/"}>Cancel</a>
       </header>
       <section className="card">
         {error && <div className="notice bad">{error}</div>}
@@ -38,7 +42,7 @@ export default async function MediaPage({ params }: { params: Promise<{ igUserId
                   <td>{m.media_type}</td>
                   <td><a href={m.permalink} target="_blank" rel="noreferrer">{(m.caption ?? "").slice(0, 80) || "(no caption)"}</a></td>
                   <td><code>{m.id}</code></td>
-                  <td><a className="btn sm" href={`/automations/new?igUserId=${igUserId}&mediaId=${m.id}`}>Automate</a></td>
+                  <td><a className="btn sm" href={targetFor(m.id)}>{query.return ? "Use this post" : "Automate"}</a></td>
                 </tr>
               ))}
             </tbody>

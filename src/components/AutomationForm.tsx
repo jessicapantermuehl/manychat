@@ -13,6 +13,8 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
     : envIgUserId
       ? [{ igUserId: envIgUserId, username: "env token account", accessToken: "", tokenExpiresAt: null }]
       : [];
+  const pickerAccount = automation?.igUserId || accountOptions[0]?.igUserId || "";
+  const returnTo = automation?.id ? `/automations/${automation.id}` : "/automations/new";
 
   return (
     <form action={saveAutomation} className="stack">
@@ -73,7 +75,14 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
         <label>
           Post / Reel ID
           <input type="text" name="mediaId" defaultValue={automation?.mediaId ?? ""} placeholder="Leave empty for every post" />
-          <span className="help">Find it via the media picker on the home page.</span>
+          <span className="help">
+            Leave empty to run on every post.{" "}
+            {pickerAccount ? (
+              <a href={`/media/${pickerAccount}?return=${encodeURIComponent(returnTo)}`}>Pick from your recent posts</a>
+            ) : (
+              "Connect an account to pick from your recent posts."
+            )}
+          </span>
         </label>
       </div>
 

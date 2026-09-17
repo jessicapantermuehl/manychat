@@ -1,7 +1,7 @@
 import { getAi, type Ai, type Triage } from "./ai";
 import { env, hasGhl } from "./env";
 import { GhlApiError, GhlClient } from "./ghl";
-import { buildDmMessage, buildQuickReplyMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
+import { buildDmMessage, buildPostbackButtonMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
 import { eligibleAutomations, findAutomation, pickPreferred, pickRandom, renderTemplate } from "./matching";
 import type { Store } from "./store";
 import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent } from "./types";
@@ -58,9 +58,10 @@ function optInMessage(automation: Automation, username: string): OutgoingMessage
   const fallback = automation.offerName.trim() ? DEFAULT_OPT_IN_PROMPT : DEFAULT_OPT_IN_PROMPT_NO_OFFER;
   const prompt = renderTemplate(automation.optInPrompt.trim() || fallback, vars(username, automation));
   const yes = automation.optInButton.trim() || DEFAULT_OPT_IN_BUTTON;
-  // One button only. They asked for this by commenting, so the DM is a confirmation, not a survey.
+  // One button, inside the bubble (a button template, not a floating quick-reply chip).
+  // They asked for this by commenting, so the DM is a confirmation, not a survey.
   // Not tapping is the "no"; typed "no" / "stop" replies are still honoured.
-  return buildQuickReplyMessage(prompt, [{ title: yes, payload: OPT_IN_YES }]);
+  return buildPostbackButtonMessage(prompt, [{ title: yes, payload: OPT_IN_YES }]);
 }
 
 const MAX_FOLLOW_UPS = 3;

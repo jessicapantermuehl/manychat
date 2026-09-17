@@ -120,7 +120,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
           Ask “want it?” with a Yes button before sending anything else
         </label>
         <span className="help">
-          Meta allows exactly one automatic reply per comment. When they tap Yes, a 24-hour window opens for the link or the email question. This is the same consent step ManyChat uses, and it is what keeps the account clear of spam flags.
+          The question is sent with the Yes button inside the bubble. Meta allows exactly one automatic reply per comment; when they tap Yes, a 24-hour window opens for the link or the email question. This is the same consent step ManyChat uses, and it is what keeps the account clear of spam flags.
         </span>
         <div className="row">
           <label>

@@ -44,10 +44,24 @@ export type OutgoingMessage =
         payload: {
           template_type: "button";
           text: string;
-          buttons: Array<{ type: "web_url"; url: string; title: string }>;
+          buttons: Array<{ type: "web_url"; url: string; title: string } | { type: "postback"; title: string; payload: string }>;
         };
       };
     };
+
+/** A message with tappable buttons inside the bubble (up to 3, titles up to 20 chars, text up to 640). */
+export function buildPostbackButtonMessage(text: string, buttons: Array<{ title: string; payload: string }>): OutgoingMessage {
+  return {
+    attachment: {
+      type: "template",
+      payload: {
+        template_type: "button",
+        text: text.slice(0, 640),
+        buttons: buttons.slice(0, 3).map((b) => ({ type: "postback", title: b.title.slice(0, 20), payload: b.payload.slice(0, 1000) })),
+      },
+    },
+  };
+}
 
 /** A text message with tappable quick-reply chips (Instagram allows up to 13, titles up to 20 chars). */
 export function buildQuickReplyMessage(text: string, replies: Array<{ title: string; payload: string }>): OutgoingMessage {

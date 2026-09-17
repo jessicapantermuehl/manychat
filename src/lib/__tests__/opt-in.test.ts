@@ -6,7 +6,8 @@ import type { Automation, CommentEvent, MessageEvent } from "../types";
 import { looksLikeNo, looksLikeYes, parseMessageEvents } from "../webhook";
 
 function fakeInstagram() {
-  const calls: Array<{ url: string; body: { recipient: unknown; message: { text?: string; quick_replies?: Array<{ title: string; payload: string }> } } }> = [];
+  type Msg = { text?: string; quick_replies?: Array<{ title: string; payload: string }>; attachment?: { type: string; payload: { template_type: string; text: string; buttons: Array<{ type: string; title: string; payload?: string; url?: string }> } } };
+  const calls: Array<{ url: string; body: { recipient: unknown; message: Msg } }> = [];
   const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
     calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
     return new Response(JSON.stringify({ recipient_id: "igsid-42", message_id: "m1" }), { status: 200 });
@@ -58,7 +59,7 @@ const tap = (payload: string, id = `tap-${payload}-${Math.random()}`): MessageEv
 const dm = (text: string): MessageEvent => ({ igUserId: "acct", senderId: "igsid-42", messageId: `mid-${text}-${Math.random()}`, text, payload: null, timestamp: Date.now() });
 
 describe("opt-in flow", () => {
-  it("the private reply is only the opt-in question with a single Yes quick reply", async () => {
+  it("the private reply is the opt-in question with a single Yes button inside the bubble", async () => {
     const store = new MemoryStore([rule]);
     const ig = fakeInstagram();
     const result = await handleCommentEvent(comment, { store, clientFor: async () => ig.client });
@@ -68,8 +69,10 @@ describe("opt-in flow", () => {
     expect(ig.calls).toHaveLength(1);
     const msg = ig.calls[0].body.message;
     expect(ig.calls[0].body.recipient).toEqual({ comment_id: "c1" });
-    expect(msg.text).toBe("Hey fan, want the guide?");
-    expect(msg.quick_replies).toEqual([{ content_type: "text", title: "Yes please!", payload: OPT_IN_YES }]);
+    expect(msg.attachment).toEqual({
+      type: "template",
+      payload: { template_type: "button", text: "Hey fan, want the guide?", buttons: [{ type: "postback", title: "Yes please!", payload: OPT_IN_YES }] },
+    });
     expect((await store.getConversation("acct", "igsid-42"))?.state).toBe("awaiting_optin");
   });
 
@@ -119,7 +122,7 @@ describe("opt-in flow", () => {
 
     const first = await handleMessageEvent(dm("what is this?"), deps);
     expect(first?.detail).toBe("asked for opt-in again");
-    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(1);
+    expect(ig.calls.at(-1)!.body.message.attachment?.payload.buttons).toHaveLength(1);
 
     const second = await handleMessageEvent(dm("hm"), deps);
     expect(second?.status).toBe("skipped");
@@ -217,7 +220,7 @@ describe("changing their mind after No", () => {
 
     const oops = await handleMessageEvent(dm("wait, I do want it!"), deps);
     expect(oops?.detail).toBe("changed their mind; asked for opt-in again");
-    expect(ig.calls.at(-1)!.body.message.quick_replies).toHaveLength(1);
+    expect(ig.calls.at(-1)!.body.message.attachment?.payload.buttons).toHaveLength(1);
     expect((await store.getConversation("acct", "igsid-42"))?.state).toBe("awaiting_optin");
 
     const yes = await handleMessageEvent(tap(OPT_IN_YES), deps);
@@ -262,7 +265,7 @@ describe("{{offer}} personalisation", () => {
     const ig = fakeInstagram();
     const deps = { store, clientFor: async () => ig.client };
     await handleCommentEvent(comment, deps);
-    expect(ig.calls[0].body.message.text).toBe("Hey fan! Thanks so much for asking for the Gut Guide. Just to confirm, would you like me to send you the link?");
+    expect(ig.calls[0].body.message.attachment?.payload.text).toBe("Hey fan! Thanks so much for asking for the Gut Guide. Just to confirm, would you like me to send you the link?");
     await handleMessageEvent(tap(OPT_IN_YES), deps);
     expect(ig.calls.at(-1)!.body.message.text).toBe("Your Gut Guide is here fan: https://example.com/guide");
   });
@@ -271,7 +274,7 @@ describe("{{offer}} personalisation", () => {
     const store = new MemoryStore([{ ...rule, offerName: "", optInPrompt: "" }]);
     const ig = fakeInstagram();
     await handleCommentEvent(comment, { store, clientFor: async () => ig.client });
-    expect(ig.calls[0].body.message.text).toBe("Hey fan! Just to confirm, would you like me to send you the link?");
+    expect(ig.calls[0].body.message.attachment?.payload.text).toBe("Hey fan! Just to confirm, would you like me to send you the link?");
   });
 });
 

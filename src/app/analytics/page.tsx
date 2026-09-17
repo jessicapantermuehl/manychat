@@ -31,10 +31,26 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
       </header>
 
       <section className="stats" aria-label={`Last ${days} days`}>
-        <div className="stat"><div className="label">Triggered</div><div className="value">{t.triggered}</div><div className="delta">comments, stories and DMs that matched</div></div>
-        <div className="stat"><div className="label">Opted in</div><div className="value">{t.optedIn}</div><div className="delta">{rate(t.optedIn, t.triggered)} of triggered</div></div>
-        <div className="stat"><div className="label">Delivered</div><div className="value">{t.delivered}</div><div className="delta">{rate(t.delivered, t.triggered)} of triggered</div></div>
-        <div className="stat"><div className="label">Emails captured</div><div className="value">{t.emails}</div><div className="delta">{rate(t.emails, t.delivered)} of delivered</div></div>
+        <div className="stat">
+          <div className="label">Triggered</div>
+          <div className="value">{t.triggered}</div>
+          <div className="delta">Someone asked for something and the app replied.</div>
+        </div>
+        <div className="stat">
+          <div className="label">Opted in</div>
+          <div className="value">{t.optedIn}</div>
+          <div className="delta">{rate(t.optedIn, t.triggered)} of triggered. They tapped the Yes button.</div>
+        </div>
+        <div className="stat">
+          <div className="label">Delivered</div>
+          <div className="value">{t.delivered}</div>
+          <div className="delta">{rate(t.delivered, t.triggered)} of triggered. The link (or email confirmation) was sent.</div>
+        </div>
+        <div className="stat">
+          <div className="label">Emails captured</div>
+          <div className="value">{t.emails}</div>
+          <div className="delta">{rate(t.emails, t.delivered)} of delivered. Address given in the DM, not on a landing page.</div>
+        </div>
       </section>
 
       <section className="card">

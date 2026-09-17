@@ -68,7 +68,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </div>
 
       <label>
-        Public replies (one per line, picked at random)
+        Public replies under the comment (one per line, picked at random)
         <textarea
           name="publicReplies"
           defaultValue={automation?.publicReplies.join("\n") ?? "Sent it to your DMs! 💌\nCheck your inbox 📩\nJust sent you the link! ✨"}
@@ -77,14 +77,14 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </label>
 
       <label>
-        DM text
+        Link message (the DM sent after they tap Yes)
         <textarea
           name="dmText"
           required
           defaultValue={automation?.dmText ?? "Sure thing, {{username}}! Here's your {{offer}}:"}
         />
         <span className="help">
-          Placeholders: <code>{"{{username}}"}</code> and <code>{"{{offer}}"}</code>. The link is added on its own line at the end, or write <code>{"{{link}}"}</code> to place it inline.
+          Order of the conversation: opt-in question (below) → they tap Yes → this message with the link. If email capture is on, the email question comes before this one. Placeholders: <code>{"{{username}}"}</code> and <code>{"{{offer}}"}</code>. The link is added on its own line at the end, or write <code>{"{{link}}"}</code> to place it inline.
         </span>
       </label>
 
@@ -101,7 +101,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </div>
 
       <fieldset className="group">
-        <legend>Opt-in (recommended)</legend>
+        <legend>Step 1: Opt-in question (recommended)</legend>
         <label className="check">
           <input type="checkbox" name="requireOptIn" defaultChecked={automation?.requireOptIn ?? true} />
           Ask “want it?” with a Yes button before sending anything else
@@ -126,7 +126,7 @@ export function AutomationForm({ automation, accounts, envIgUserId }: Props) {
       </fieldset>
 
       <fieldset className="group">
-        <legend>Email capture → GoHighLevel</legend>
+        <legend>Optional step 2: Email capture → GoHighLevel</legend>
         <label className="check">
           <input type="checkbox" name="collectEmail" defaultChecked={automation?.collectEmail ?? false} />
           Ask for an email address before sending the link

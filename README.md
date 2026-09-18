@@ -24,6 +24,14 @@ Instagram API with Instagram Login.
 5. Every comment and reply is logged on the dashboard as `sent`, `skipped`, `failed` or `captured`
    with the reason.
 
+### Default reply
+
+Under **Voice & AI** you can set a default reply: the message sent when someone writes and
+nothing else answers, for example "thank you!" after the link arrived. It carries up to two link
+buttons, goes out at most once per person within a cooldown (7 days by default), and can be
+limited to people who came through an automation or opened to anyone who DMs. Never sent for
+button taps, stop words, or to anyone who asked to stop.
+
 ### Analytics
 
 The **Analytics** page shows, for the last 7, 30 or 90 days: triggered → opted in → delivered →

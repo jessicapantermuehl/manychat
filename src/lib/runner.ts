@@ -1,7 +1,7 @@
 import { getAi, type Ai, type Triage } from "./ai";
 import { env, hasGhl } from "./env";
 import { GhlApiError, GhlClient } from "./ghl";
-import { buildDmMessage, buildPostbackButtonMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
+import { buildDmMessage, buildLinkButtonMessage, buildPostbackButtonMessage, InstagramApiError, InstagramClient, type OutgoingMessage } from "./instagram";
 import { eligibleAutomations, eligibleInboundAutomations, findAutomation, keywordMatches, pickPreferred, pickRandom, renderTemplate } from "./matching";
 import type { Store } from "./store";
 import type { ActivityRecord, Automation, CommentEvent, Conversation, MessageEvent, TriggerKind } from "./types";
@@ -416,6 +416,67 @@ async function handleInboundTrigger(event: MessageEvent, existing: Conversation 
  * otherwise ignored so the app never talks to people who did not ask for something.
  */
 export async function handleMessageEvent(event: MessageEvent, deps: RunnerDeps): Promise<ActivityRecord | null> {
+  const handled = await routeMessageEvent(event, deps);
+  if (handled) return handled;
+  return maybeAutoReply(event, deps);
+}
+
+/**
+ * The default reply: when someone writes and nothing else handled it (no running flow, no
+ * trigger matched), send the account's default message with its link buttons, at most once per
+ * person per cooldown. Never for taps, stop words, or people who asked to stop.
+ */
+async function maybeAutoReply(event: MessageEvent, deps: RunnerDeps): Promise<ActivityRecord | null> {
+  const { store } = deps;
+  const log = deps.log ?? (() => {});
+  if (event.payload || event.storyMention || !event.text.trim()) return null;
+  if (looksLikeStop(event.text)) return null;
+
+  const settings = await store.getSettings(event.igUserId);
+  if (!settings?.autoReplyEnabled || !settings.autoReplyText.trim()) return null;
+
+  const conversation = await store.getConversation(event.igUserId, event.senderId);
+  if (conversation?.closedReason === "stopped") return null;
+  if (settings.autoReplyScope === "automation" && !conversation) return null;
+
+  const last = await store.getLastAutoReply(event.igUserId, event.senderId);
+  const cooldownMs = Math.max(0, settings.autoReplyCooldownDays) * 86_400_000;
+  if (last && Date.now() - Date.parse(last) < cooldownMs) return null;
+
+  const client = await deps.clientFor(event.igUserId);
+  if (!client) return null;
+
+  const base: Base = { commentId: event.messageId, igUserId: event.igUserId, fromUsername: conversation?.username ?? "", commentText: event.text };
+  const finish: Finish = async (record) => {
+    try {
+      await store.recordActivity(record);
+    } catch (err) {
+      log("failed to record activity", err);
+    }
+    return record;
+  };
+
+  const buttons = settings.autoReplyButtons.filter((b) => b.title.trim() && /^https?:\/\//i.test(b.url.trim())).slice(0, 3);
+  const text = renderTemplate(settings.autoReplyText, { username: conversation?.username ?? "", link: "" }).trim();
+  try {
+    if (buttons.length === 0) {
+      await client.sendMessage(event.igUserId, event.senderId, { text: text.slice(0, 1000) });
+    } else if (text.length <= 640) {
+      await client.sendMessage(event.igUserId, event.senderId, buildLinkButtonMessage(text, buttons));
+    } else {
+      // Button templates cap the text at 640 chars: send the message, then the buttons under a short line.
+      await client.sendMessage(event.igUserId, event.senderId, { text: text.slice(0, 1000) });
+      await client.sendMessage(event.igUserId, event.senderId, buildLinkButtonMessage("Quick links:", buttons));
+    }
+    await store.recordAutoReply(event.igUserId, event.senderId);
+    return finish({ ...base, automationId: null, status: "sent", detail: "default reply sent" });
+  } catch (err) {
+    log("default reply failed", err);
+    return finish({ ...base, automationId: null, status: "failed", detail: `default reply failed: ${describeError(err)}` });
+  }
+}
+
+async function routeMessageEvent(event: MessageEvent, deps: RunnerDeps): Promise<ActivityRecord | null> {
   const { store } = deps;
   const log = deps.log ?? (() => {});
 

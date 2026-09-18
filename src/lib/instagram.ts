@@ -63,6 +63,20 @@ export function buildPostbackButtonMessage(text: string, buttons: Array<{ title:
   };
 }
 
+/** A message with link buttons inside the bubble (up to 3, titles up to 20 chars, text up to 640). */
+export function buildLinkButtonMessage(text: string, buttons: Array<{ title: string; url: string }>): OutgoingMessage {
+  return {
+    attachment: {
+      type: "template",
+      payload: {
+        template_type: "button",
+        text: text.slice(0, 640),
+        buttons: buttons.slice(0, 3).map((b) => ({ type: "web_url", url: b.url, title: b.title.slice(0, 20) })),
+      },
+    },
+  };
+}
+
 /** A text message with tappable quick-reply chips (Instagram allows up to 13, titles up to 20 chars). */
 export function buildQuickReplyMessage(text: string, replies: Array<{ title: string; payload: string }>): OutgoingMessage {
   return {

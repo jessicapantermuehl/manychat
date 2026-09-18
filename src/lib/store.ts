@@ -27,6 +27,10 @@ export interface Store {
 
   getSettings(igUserId: string): Promise<AccountSettings | null>;
   upsertSettings(settings: AccountSettings): Promise<void>;
+
+  /** When the default reply was last sent to this person, or null. */
+  getLastAutoReply(igUserId: string, igsid: string): Promise<string | null>;
+  recordAutoReply(igUserId: string, igsid: string): Promise<void>;
 }
 
 /* ---------- Supabase implementation ---------- */
@@ -304,7 +308,7 @@ export class SupabaseStore implements Store {
   async getSettings(igUserId: string) {
     const { data, error } = await this.db.from("cs_settings").select("*").eq("ig_user_id", igUserId).maybeSingle();
     if (error) throw error;
-    return data ? { igUserId: data.ig_user_id, voiceSamples: data.voice_samples ?? "", brandNotes: data.brand_notes ?? "" } : null;
+    return data ? settingsFromRow(data) : null;
   }
 
   async upsertSettings(s: AccountSettings) {
@@ -312,10 +316,39 @@ export class SupabaseStore implements Store {
       ig_user_id: s.igUserId,
       voice_samples: s.voiceSamples,
       brand_notes: s.brandNotes,
+      auto_reply_enabled: s.autoReplyEnabled,
+      auto_reply_scope: s.autoReplyScope,
+      auto_reply_text: s.autoReplyText,
+      auto_reply_buttons: s.autoReplyButtons,
+      auto_reply_cooldown_days: s.autoReplyCooldownDays,
       updated_at: new Date().toISOString(),
     });
     if (error) throw error;
   }
+
+  async getLastAutoReply(igUserId: string, igsid: string) {
+    const { data, error } = await this.db.from("cs_auto_replies").select("sent_at").eq("ig_user_id", igUserId).eq("igsid", igsid).maybeSingle();
+    if (error) throw error;
+    return data?.sent_at ?? null;
+  }
+
+  async recordAutoReply(igUserId: string, igsid: string) {
+    const { error } = await this.db.from("cs_auto_replies").upsert({ ig_user_id: igUserId, igsid, sent_at: new Date().toISOString() });
+    if (error) throw error;
+  }
+}
+
+function settingsFromRow(data: Record<string, unknown>): AccountSettings {
+  return {
+    igUserId: String(data.ig_user_id),
+    voiceSamples: (data.voice_samples as string) ?? "",
+    brandNotes: (data.brand_notes as string) ?? "",
+    autoReplyEnabled: Boolean(data.auto_reply_enabled),
+    autoReplyScope: data.auto_reply_scope === "anyone" ? "anyone" : "automation",
+    autoReplyText: (data.auto_reply_text as string) ?? "",
+    autoReplyButtons: Array.isArray(data.auto_reply_buttons) ? (data.auto_reply_buttons as AccountSettings["autoReplyButtons"]) : [],
+    autoReplyCooldownDays: Number(data.auto_reply_cooldown_days ?? 7),
+  };
 }
 
 /* ---------- In-memory / env-JSON implementation (no database) ---------- */
@@ -326,6 +359,7 @@ export class MemoryStore implements Store {
   private accounts = new Map<string, IgAccount>();
   private conversations = new Map<string, Conversation>();
   private settings = new Map<string, AccountSettings>();
+  private autoReplies = new Map<string, string>();
 
   constructor(seed: Automation[] = []) {
     this.automations = [...seed];
@@ -389,6 +423,12 @@ export class MemoryStore implements Store {
   }
   async upsertSettings(s: AccountSettings) {
     this.settings.set(s.igUserId, s);
+  }
+  async getLastAutoReply(igUserId: string, igsid: string) {
+    return this.autoReplies.get(`${igUserId}:${igsid}`) ?? null;
+  }
+  async recordAutoReply(igUserId: string, igsid: string) {
+    this.autoReplies.set(`${igUserId}:${igsid}`, new Date().toISOString());
   }
 }
 

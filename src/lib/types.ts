@@ -165,11 +165,25 @@ export interface ActivityRecord {
   createdAt?: string;
 }
 
-/** Per-account settings used by the AI features. */
+export interface AutoReplyButton {
+  title: string;
+  url: string;
+}
+
+/** Per-account settings: AI voice, plus the default reply for messages nothing else handles. */
 export interface AccountSettings {
   igUserId: string;
   voiceSamples: string;
   brandNotes: string;
+  /** Send the default reply when someone messages and no automation or running flow handles it. */
+  autoReplyEnabled: boolean;
+  /** "automation": only people who came through an automation. "anyone": any DM. */
+  autoReplyScope: "automation" | "anyone";
+  autoReplyText: string;
+  /** Up to two link buttons under the message. */
+  autoReplyButtons: AutoReplyButton[];
+  /** Days before the same person can get the default reply again. */
+  autoReplyCooldownDays: number;
 }
 
 export interface IgAccount {

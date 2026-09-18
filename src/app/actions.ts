@@ -159,10 +159,22 @@ export async function saveSettings(form: FormData) {
   let failure: string | null = null;
   try {
     if (!igUserId) throw new Error("Choose an account.");
+    const buttons = [1, 2]
+      .map((i) => ({ title: String(form.get(`button${i}Title`) ?? "").trim().slice(0, 20), url: String(form.get(`button${i}Url`) ?? "").trim() }))
+      .filter((b) => b.title && b.url);
+    for (const b of buttons) {
+      if (!/^https?:\/\//i.test(b.url)) throw new Error(`Button "${b.title}" needs a full link starting with https://`);
+    }
+    const cooldown = Number(form.get("autoReplyCooldownDays") ?? 7);
     await getStore().upsertSettings({
       igUserId,
       voiceSamples: String(form.get("voiceSamples") ?? "").trim(),
       brandNotes: String(form.get("brandNotes") ?? "").trim(),
+      autoReplyEnabled: form.get("autoReplyEnabled") === "on",
+      autoReplyScope: form.get("autoReplyScope") === "anyone" ? "anyone" : "automation",
+      autoReplyText: String(form.get("autoReplyText") ?? "").trim(),
+      autoReplyButtons: buttons,
+      autoReplyCooldownDays: Number.isFinite(cooldown) && cooldown >= 0 ? Math.floor(cooldown) : 7,
     });
     revalidatePath("/settings");
   } catch (err) {
